@@ -54,6 +54,12 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 .fabs{position:fixed;z-index:1100;right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 70px);display:flex;flex-direction:column;gap:8px}
 .fabs button{width:44px;height:44px;border-radius:10px;border:0;background:var(--panel);box-shadow:var(--shadow);display:grid;place-items:center}
 .fabs button:disabled{opacity:.4;cursor:default}
+.fabs button.on{background:#ffd43b}
+.fabs button.on svg{stroke:#1b1f23}
+.chk.small{font-size:13px;display:flex;gap:6px;align-items:center}
+.btn.danger-fill{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn:disabled{opacity:.45;cursor:default}
+.pp-row2{margin-top:6px}
 .fabs svg{width:22px;height:22px;stroke:var(--fg);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* Bottom stack: messages, drawing bars and the stats sheet push each other up instead of overlapping */
@@ -166,6 +172,7 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 
 <div class="fabs">
   <button id="btnLocate" title="Show my location" aria-label="Show my location"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+  <button id="btnErase" title="Remove roads in an area" aria-label="Remove roads in an area"><svg viewBox="0 0 24 24"><path d="m7 21-4-4a2 2 0 0 1 0-2.8L13.2 4a2 2 0 0 1 2.8 0l5 5a2 2 0 0 1 0 2.8L12 21"/><path d="M7 21h14"/><path d="m9 11 6 6"/></svg></button>
   <button id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
 </div>
 
@@ -178,6 +185,18 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
     <button id="drawUndo" class="btn">Undo point</button>
     <button id="drawCancel" class="btn">Cancel</button>
     <button id="drawFinish" class="btn primary">Save line</button>
+  </div>
+</div>
+
+<div id="erasebar" class="drawbar" hidden>
+  <div class="drawinfo" id="eraseInfo">Drag a box over the roads you want to remove.</div>
+  <div class="row">
+    <label class="chk small"><input id="eraseTouch" type="checkbox"> Include roads crossing the edge</label>
+    <label class="chk small"><input id="erasePins" type="checkbox"> Pins too</label>
+  </div>
+  <div class="row">
+    <button id="eraseCancel" class="btn">Done</button>
+    <button id="eraseGo" class="btn danger-fill" disabled>Remove selected</button>
   </div>
 </div>
 
@@ -352,7 +371,8 @@ function normalizeFeature(f, fallbackCls = 'free', fallbackKind = 'free') {
       name: String(p.name || '').slice(0, 120), way: Number.isFinite(+p.way) && p.way !== null ? +p.way : null,
       added: Number.isFinite(+p.added) && +p.added > 0 ? +p.added : Date.now(), m: lineM(coords),
       status: planned ? 'planned' : 'ridden', plan: planned ? p.plan.slice(0, 40) : '',
-      base: (typeof p.base === 'string' && p.base) ? p.base.slice(0, 120) : id}};
+      base: (typeof p.base === 'string' && p.base) ? p.base.slice(0, 120) : id,
+      grp: typeof p.grp === 'string' ? p.grp.slice(0, 40) : ''}}; // grp ties together segments saved as one route / GPX file
 }
 function asPlanned(f, plan) {
   const base = f.properties.status === 'planned' ? f.properties.base : f.properties.id;
@@ -524,6 +544,24 @@ function openFeaturePopup(id, latlng) {
   b.onclick = () => { map.closePopup(); removeFeatures([id]); toast('Removed ' + (p.name || 'segment'), '', 5000, {label:'Undo', fn:undo}); };
   row.appendChild(b);
   el.appendChild(row);
+  // segments saved together (one route, one GPX file) can be handled as a whole
+  const grp = p.grp ? store.features.filter(x => x.properties.grp === p.grp && x.properties.status === p.status && (!planned || x.properties.plan === p.plan)) : [];
+  if (grp.length > 1) {
+    const km = fmtKm(grp.reduce((s, x) => s + x.properties.m, 0));
+    const row2 = document.createElement('div'); row2.className = 'pp-row pp-row2';
+    if (planned) {
+      const rb = riddenBases(), todo = grp.filter(x => !rb.has(x.properties.base));
+      if (todo.length) {
+        const mr = document.createElement('button'); mr.className = 'ok'; mr.textContent = `Mark route ridden`;
+        mr.onclick = () => { map.closePopup(); const a = addFeatures(todo.map(asRidden)); toast(`Marked ${a.length} segment(s) ridden`, '', 5000, {label:'Undo', fn:undo}); };
+        row2.appendChild(mr);
+      }
+    }
+    const rw = document.createElement('button'); rw.textContent = `Remove whole route (${grp.length} · ${km} km)`;
+    rw.onclick = () => { map.closePopup(); const r = removeFeatures(grp.map(x => x.properties.id)); toast(`Removed route · ${r.length} segments · ${km} km`, '', 6000, {label:'Undo', fn:undo}); };
+    row2.appendChild(rw);
+    el.appendChild(row2);
+  }
   L.popup({autoPanPadding:[40, 80]}).setLatLng(latlng).setContent(el).openOn(map);
 }
 
@@ -1349,7 +1387,8 @@ async function onRouteTap(latlng) {
 }
 function saveRoute() {
   if (!route.legs.length) { toast('Place at least two points to make a route.', 'warn'); return; }
-  const feats = stamp(finalizeRoute(route.legs));
+  const grp = 'g' + Date.now().toString(36);
+  const feats = stamp(finalizeRoute(route.legs)).map(f => ({...f, properties:{...f.properties, grp}}));
   if (!feats.length) return; // plan creation cancelled
   const before = store.features.length;
   const added = addFeatures(feats);
@@ -1369,16 +1408,20 @@ function setMode(m) {
   if (m === mode) return;
   if (mode === 'free' && draft.pts.length) { toast('Finish or cancel the current line first.', 'warn'); return; }
   if (mode === 'route' && route.way.length) { toast('Save or cancel the current route first.', 'warn'); return; }
+  const prevMode = mode;
   mode = m;
   for (const [id, k] of [['modeRoad', 'road'], ['modeRoute', 'route'], ['modeFree', 'free'], ['modePin', 'pin']]) { $(id).classList.toggle('on', m === k); $(id).setAttribute('aria-checked', String(m === k)); }
   map.getContainer().classList.toggle('free-mode', m !== 'road');
-  $('drawbar').hidden = m !== 'free'; $('routebar').hidden = m !== 'route';
+  if (prevMode === 'erase' || m === 'erase') eraseEnable(m === 'erase');
+  $('btnErase').classList.toggle('on', m === 'erase');
+  $('drawbar').hidden = m !== 'free'; $('routebar').hidden = m !== 'route'; $('erasebar').hidden = m !== 'erase';
   document.body.classList.toggle('drawing', m !== 'road'); // lifts messages above the bar
   if (m !== 'road') setSheet(false);
   if (m === 'road') map.doubleClickZoom.enable(); else map.doubleClickZoom.disable(); // stray double taps shouldn't zoom while placing points
   if (m === 'free') { draft.dots.addTo(map); updateDraft(); } else { clearDraft(); map.removeLayer(draft.dots); }
   if (m === 'route') { route.layer.addTo(map); routeRedraw(); } else { clearRoute(); map.removeLayer(route.layer); }
   if (m === 'pin') toast('Tap the map where you want a pin.');
+  if (m === 'erase') toast('Move the map into place first, then drag a box over the roads to remove. Pinch or the mouse wheel still zooms.', '', 6000);
 }
 function updateDraft() {
   const coords = draft.pts.map(p => [p.lng, p.lat]);
@@ -1413,12 +1456,112 @@ $('drawFinish').onclick = finishDraft;
 map.on('dblclick', () => { if (mode === 'free' && draft.pts.length > 1) finishDraft(); });
 
 map.on('click', e => {
-  if (Date.now() < suppressMapClickUntil) return;
+  if (Date.now() < suppressMapClickUntil || mode === 'erase') return;
   if (mode === 'free') { draft.pts.push(e.latlng); updateDraft(); }
   else if (mode === 'route') onRouteTap(e.latlng);
   else if (mode === 'pin') openPinDialog({lat:r5(e.latlng.lat), lon:r5(e.latlng.lng)});
   else onRoadTap(e.latlng);
 });
+
+/* ---------- area erase ----------
+   Drag a box; segments (and optionally pins) inside it are previewed in yellow, then removed in one undoable step.
+   Default selects only segments fully inside the box; "crossing the edge" also takes ones that touch it. */
+map.createPane('erasePreview').style.zIndex = 430;
+map.getPane('erasePreview').style.pointerEvents = 'none';
+const eraseRenderer = L.canvas({pane:'erasePreview'});
+const erase = {start:null, rect:null, bounds:null, sel:{ids:[], pins:[], m:0}, preview:L.layerGroup(), pointers:new Set()};
+
+function eraseSelect(bounds) {
+  const w = bounds.getWest(), s = bounds.getSouth(), e = bounds.getEast(), n = bounds.getNorth();
+  const inBox = c => c[0] >= w && c[0] <= e && c[1] >= s && c[1] <= n;
+  const touch = $('eraseTouch').checked, rb = riddenBases();
+  const ids = [], pins = []; let m = 0;
+  for (const f of store.features) {
+    if (!isVisible(f, rb)) continue;
+    const c = f.geometry.coordinates;
+    let sel;
+    if (touch) { sel = c.some(inBox); for (let i = 0; !sel && i < c.length - 1; i++) sel = !!clipSeg(c[i], c[i + 1], w, s, e, n); }
+    else sel = c.every(inBox);
+    if (sel) { ids.push(f.properties.id); m += f.properties.m; }
+  }
+  if ($('erasePins').checked) for (const p of store.pins) if (pinVisible(p) && inBox([p.lon, p.lat])) pins.push(p.id);
+  return {ids, pins, m};
+}
+function eraseRefresh() {
+  erase.preview.clearLayers();
+  if (!erase.bounds) { $('eraseInfo').textContent = 'Drag a box over the roads you want to remove.'; $('eraseGo').disabled = true; return; }
+  erase.sel = eraseSelect(erase.bounds);
+  const ids = new Set(erase.sel.ids);
+  for (const f of store.features) if (ids.has(f.properties.id))
+    L.polyline(f.geometry.coordinates.map(c => [c[1], c[0]]), {renderer:eraseRenderer, color:'#ffd43b', weight:7, opacity:.95, interactive:false, lineCap:'round'}).addTo(erase.preview);
+  const np = erase.sel.pins.length;
+  $('eraseInfo').textContent = `${ids.size} segment${ids.size === 1 ? '' : 's'} · ${fmtKm(erase.sel.m)} km${np ? ` · ${np} pin${np === 1 ? '' : 's'}` : ''} selected. Drag again to change the box.`;
+  $('eraseGo').disabled = !ids.size && !np;
+}
+function eraseReset() {
+  if (erase.rect) { erase.rect.remove(); erase.rect = null; }
+  erase.start = null; erase.bounds = null; erase.sel = {ids:[], pins:[], m:0};
+  eraseRefresh();
+}
+function eraseEnable(on) {
+  const c = map.getContainer();
+  if (on) {
+    map.dragging.disable(); map.boxZoom.disable(); // two-finger pinch stays available for zooming
+    c.style.touchAction = 'none'; erase.preview.addTo(map);
+    c.addEventListener('pointerdown', erasePointerDown); c.addEventListener('pointermove', erasePointerMove); c.addEventListener('pointerup', erasePointerUp); c.addEventListener('pointercancel', erasePointerUp);
+    eraseReset();
+  } else {
+    map.dragging.enable(); map.boxZoom.enable(); erase.pointers.clear();
+    c.style.touchAction = ''; erase.preview.remove();
+    c.removeEventListener('pointerdown', erasePointerDown); c.removeEventListener('pointermove', erasePointerMove); c.removeEventListener('pointerup', erasePointerUp); c.removeEventListener('pointercancel', erasePointerUp);
+    eraseReset();
+  }
+}
+function erasePointerDown(e) {
+  if (e.target.closest('.leaflet-control')) return; // let zoom/layer buttons work
+  erase.pointers.add(e.pointerId);
+  if (erase.pointers.size > 1) { // second finger: this is a pinch, not a box
+    if (erase.rect && !erase.bounds) { erase.rect.remove(); erase.rect = null; }
+    erase.start = null; return;
+  }
+  e.preventDefault();
+  erase.start = map.mouseEventToLatLng(e);
+  if (erase.rect) erase.rect.remove();
+  erase.rect = L.rectangle([erase.start, erase.start], {color:'#ffd43b', weight:2, dashArray:'6 4', fillOpacity:.12, interactive:false}).addTo(map);
+  map.getContainer().setPointerCapture?.(e.pointerId);
+}
+function erasePointerMove(e) {
+  if (!erase.start) return;
+  erase.rect.setBounds(L.latLngBounds(erase.start, map.mouseEventToLatLng(e)));
+}
+function erasePointerUp(e) {
+  erase.pointers.delete(e.pointerId);
+  if (!erase.start) return;
+  const b = L.latLngBounds(erase.start, map.mouseEventToLatLng(e));
+  erase.start = null;
+  const px = map.latLngToContainerPoint(b.getNorthWest()).distanceTo(map.latLngToContainerPoint(b.getSouthEast()));
+  if (px < 12) { eraseReset(); return; } // a tap, not a drag
+  erase.bounds = b; erase.rect.setBounds(b);
+  eraseRefresh();
+}
+function eraseApply() {
+  const {ids, pins} = erase.sel;
+  if (!ids.length && !pins.length) return;
+  const pinSet = new Set(pins), now = Date.now();
+  const removedPins = store.pins.filter(p => pinSet.has(p.id));
+  store.pins = store.pins.filter(p => !pinSet.has(p.id));
+  for (const p of removedPins) store.meta.deleted[p.id] = now;
+  const removed = removeFeatures(ids, false);
+  pushUndo({op:'remove', feats:removed, pins:removedPins});
+  if (!removed.length) changed();
+  toast(`Removed ${removed.length} segment${removed.length === 1 ? '' : 's'}${removedPins.length ? ` and ${removedPins.length} pin${removedPins.length === 1 ? '' : 's'}` : ''}`, '', 6000, {label:'Undo', fn:undo});
+  eraseReset();
+}
+$('btnErase').onclick = () => setMode(mode === 'erase' ? 'road' : 'erase');
+$('eraseCancel').onclick = () => setMode('road');
+$('eraseGo').onclick = eraseApply;
+$('eraseTouch').onchange = eraseRefresh;
+$('erasePins').onchange = eraseRefresh;
 
 /* ---------- import / export ---------- */
 function thin(coords, minM = 8) {
@@ -1431,7 +1574,7 @@ function parseGPX(text, fname) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.querySelector('parsererror')) throw new Error(`${fname}: not a valid GPX/XML file`);
   const baseName = (doc.querySelector('trk > name, rte > name, metadata > name')?.textContent || fname.replace(/\.gpx$/i, '')).trim();
-  const feats = [];
+  const feats = [], grp = 'g' + hash(fname + Date.now());
   const segs = [...doc.querySelectorAll('trkseg, rte')];
   segs.forEach((seg, si) => {
     const coords = [...seg.querySelectorAll('trkpt, rtept')].map(p => [+p.getAttribute('lon'), +p.getAttribute('lat')]).filter(validCoord);
@@ -1439,7 +1582,7 @@ function parseGPX(text, fname) {
     const th = thin(coords);
     const id = 'g' + hash(fname + '|' + si + '|' + coords.length + '|' + coords[0] + '|' + coords[coords.length - 1]);
     const f = normalizeFeature({type:'Feature', geometry:{type:'LineString', coordinates:th},
-      properties:{id, kind:'gpx', cls:'gpx', name: segs.length > 1 ? `${baseName} (${si + 1})` : baseName, added:Date.now()}});
+      properties:{id, kind:'gpx', cls:'gpx', name: segs.length > 1 ? `${baseName} (${si + 1})` : baseName, grp, added:Date.now()}});
     if (f) feats.push(f);
   });
   if (!feats.length) throw new Error(`${fname}: no track or route points found`);
@@ -1618,6 +1761,7 @@ $('btnUndo').onclick = undo;
 /* ---------- keyboard ---------- */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('pinDlg').hidden) { closePinDialog(); return; }
+  if (e.key === 'Escape' && mode === 'erase') { setMode('road'); return; }
   if (e.target.matches('input, textarea, select')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   else if (e.key === 'Escape') { if (!$('dlg').hidden) closeSettings(); else if (mode === 'free') { clearDraft(); setMode('road'); } else if (mode === 'route') { clearRoute(); setMode('road'); } }
