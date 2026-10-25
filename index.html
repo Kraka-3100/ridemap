@@ -181,11 +181,14 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>/* vector tile decoder: @mapbox/vector-tile 3.0.0 + pbf 5.1.2 (BSD-3-Clause), bundled */
+(()=>{function x(e,t){this.x=e,this.y=t}x.prototype={clone(){return new x(this.x,this.y)},add(e){return this.clone()._add(e)},sub(e){return this.clone()._sub(e)},multByPoint(e){return this.clone()._multByPoint(e)},divByPoint(e){return this.clone()._divByPoint(e)},mult(e){return this.clone()._mult(e)},div(e){return this.clone()._div(e)},rotate(e){return this.clone()._rotate(e)},rotateAround(e,t){return this.clone()._rotateAround(e,t)},matMult(e){return this.clone()._matMult(e)},unit(){return this.clone()._unit()},perp(){return this.clone()._perp()},round(){return this.clone()._round()},mag(){return Math.sqrt(this.x*this.x+this.y*this.y)},equals(e){return this.x===e.x&&this.y===e.y},dist(e){return Math.sqrt(this.distSqr(e))},distSqr(e){let t=e.x-this.x,i=e.y-this.y;return t*t+i*i},angle(){return Math.atan2(this.y,this.x)},angleTo(e){return Math.atan2(this.y-e.y,this.x-e.x)},angleWith(e){return this.angleWithSep(e.x,e.y)},angleWithSep(e,t){return Math.atan2(this.x*t-this.y*e,this.x*e+this.y*t)},_matMult(e){let t=e[0]*this.x+e[1]*this.y,i=e[2]*this.x+e[3]*this.y;return this.x=t,this.y=i,this},_add(e){return this.x+=e.x,this.y+=e.y,this},_sub(e){return this.x-=e.x,this.y-=e.y,this},_mult(e){return this.x*=e,this.y*=e,this},_div(e){return this.x/=e,this.y/=e,this},_multByPoint(e){return this.x*=e.x,this.y*=e.y,this},_divByPoint(e){return this.x/=e.x,this.y/=e.y,this},_unit(){return this._div(this.mag()),this},_perp(){let e=this.y;return this.y=this.x,this.x=-e,this},_rotate(e){let t=Math.cos(e),i=Math.sin(e),n=t*this.x-i*this.y,r=i*this.x+t*this.y;return this.x=n,this.y=r,this},_rotateAround(e,t){let i=Math.cos(e),n=Math.sin(e),r=t.x+i*(this.x-t.x)-n*(this.y-t.y),s=t.y+n*(this.x-t.x)+i*(this.y-t.y);return this.x=r,this.y=s,this},_round(){return this.x=Math.round(this.x),this.y=Math.round(this.y),this},constructor:x};x.convert=function(e){if(e instanceof x)return e;if(Array.isArray(e))return new x(+e[0],+e[1]);if(e.x!==void 0&&e.y!==void 0)return new x(+e.x,+e.y);throw new Error("Expected [x, y] or {x, y} point format")};var y=class{constructor(t,i,n,r,s){for(this.properties=Object.create(null),this.extent=n,this.type=0,this.id=void 0,this._pbf=t,this._geometry=-1,this._keys=r,this._values=s;t.pos<i;){let h=t.readVarint();if(h===8)this.id=t.readVarint();else if(h===18){let o=t.readVarint()+t.pos;for(;t.pos<o;){let a=r[t.readVarint()],d=s[t.readVarint()];this.properties[a]=d}}else h===24?this.type=t.readVarint():(h===34&&(this._geometry=t.pos),t.skip(h))}}loadGeometry(){if(this._geometry<0)throw new Error("feature has no geometry");let t=this._pbf;t.pos=this._geometry;let i=t.readVarint()+t.pos,n=[],r,s=1,h=0,o=0,a=0;for(;t.pos<i;){if(h<=0){let d=t.readVarint();if(s=d&7,h=d>>3,h===0)continue}if(h--,s===1)o+=t.readSVarint(),a+=t.readSVarint(),r&&n.push(r),r=[new x(o,a)];else if(s===2)o+=t.readSVarint(),a+=t.readSVarint(),r&&r.push(new x(o,a));else if(s===7)r&&r.push(r[0].clone());else throw new Error(`unknown command ${s}`)}return r&&n.push(r),n}bbox(){if(this._geometry<0)throw new Error("feature has no geometry");let t=this._pbf;t.pos=this._geometry;let i=t.readVarint()+t.pos,n=1,r=0,s=0,h=0,o=1/0,a=-1/0,d=1/0,l=-1/0;for(;t.pos<i;){if(r<=0){let w=t.readVarint();if(n=w&7,r=w>>3,r===0)continue}if(r--,n===1||n===2)s+=t.readSVarint(),h+=t.readSVarint(),s<o&&(o=s),s>a&&(a=s),h<d&&(d=h),h>l&&(l=h);else if(n!==7)throw new Error(`unknown command ${n}`)}return[o,d,a,l]}toGeoJSON(t,i,n){let r=this.extent*Math.pow(2,n),s=this.extent*t,h=this.extent*i,o=this.loadGeometry();function a(u){return[(u.x+s)*360/r-180,360/Math.PI*Math.atan(Math.exp((1-(u.y+h)*2/r)*Math.PI))-90]}function d(u){return u.map(a)}let l;if(this.type===1){let u=[];for(let g of o)u.push(g[0]);let f=d(u);l=u.length===1?{type:"Point",coordinates:f[0]}:{type:"MultiPoint",coordinates:f}}else if(this.type===2){let u=o.map(d);l=u.length===1?{type:"LineString",coordinates:u[0]}:{type:"MultiLineString",coordinates:u}}else if(this.type===3){let u=P(o),f=[];for(let g of u)f.push(g.map(d));l=f.length===1?{type:"Polygon",coordinates:f[0]}:{type:"MultiPolygon",coordinates:f}}else throw new Error("unknown feature type");let w={type:"Feature",geometry:l,properties:this.properties};return this.id!=null&&(w.id=this.id),w}};y.types=["Unknown","Point","LineString","Polygon"];function P(e){let t=e.length;if(t<=1)return[e];let i=[],n,r;for(let s=0;s<t;s++){let h=k(e[s]);h!==0&&(r===void 0&&(r=h<0),r===h<0?(n&&i.push(n),n=[e[s]]):n&&n.push(e[s]))}return n&&i.push(n),i}function k(e){let t=0;for(let i=0,n=e.length,r=n-1,s,h;i<n;r=i++)s=e[i],h=e[r],t+=(h.x-s.x)*(s.y+h.y);return t}var V=class{constructor(t,i){for(this.version=1,this.name="",this.extent=4096,this.length=0,this._pbf=t,this._keys=[],this._values=[],this._features=[],i===void 0&&(i=t.length);t.pos<i;){let n=t.readVarint();n===10?this.name=t.readString():n===18?(this._features.push(t.pos),t.skip(n)):n===26?this._keys.push(t.readString()):n===34?this._values.push(m(t)):n===40?this.extent=t.readVarint():n===120?this.version=t.readVarint():t.skip(n)}this.length=this._features.length}feature(t){if(t<0||t>=this._features.length)throw new Error("feature index out of bounds");this._pbf.pos=this._features[t];let i=this._pbf.readVarint()+this._pbf.pos;return new y(this._pbf,i,this.extent,this._keys,this._values)}};function m(e){let t=null,i=e.readVarint()+e.pos;for(;e.pos<i;){let n=e.readVarint();t=n===10?e.readString():n===21?e.readFloat():n===25?e.readDouble():n===32?e.readVarint(!0):n===40?e.readVarint():n===48?e.readSVarint():n===56?e.readBoolean():(e.skip(n),null)}if(t==null)throw new Error("unknown feature value");return t}var F=class{constructor(t,i=t.length){let n=Object.create(null);for(;t.pos<i;){let r=t.readVarint();if(r===26){let s=new V(t,t.readVarint()+t.pos);s.length&&(n[s.name]=s)}else t.skip(r)}this.layers=n}};var M=12,_=typeof TextDecoder=="undefined"?null:new TextDecoder("utf-8"),E=0,B=1,S=2,D=5,p=class{constructor(t){this.buf=ArrayBuffer.isView(t)?t:new Uint8Array(t),this.dataView=new DataView(this.buf.buffer,this.buf.byteOffset,this.buf.byteLength),this.pos=0,this.type=0,this._valueStart=-1,this.length=this.buf.length}readFields(t,i,n=this.length){let r;for(;r=this.nextField(n);)t(r,i,this);return i}readMessage(t,i){return this.readFields(t,i,this.readVarint()+this.pos)}readFixed32(){let t=this.dataView.getUint32(this.pos,!0);return this.pos+=4,t}readSFixed32(){let t=this.dataView.getInt32(this.pos,!0);return this.pos+=4,t}readFixed64(){let t=this.dataView.getUint32(this.pos,!0)+this.dataView.getUint32(this.pos+4,!0)*4294967296;return this.pos+=8,t}readSFixed64(){let t=this.dataView.getUint32(this.pos,!0)+this.dataView.getInt32(this.pos+4,!0)*4294967296;return this.pos+=8,t}readFloat(){let t=this.dataView.getFloat32(this.pos,!0);return this.pos+=4,t}readDouble(){let t=this.dataView.getFloat64(this.pos,!0);return this.pos+=8,t}readVarint(t){let i=this.buf,n=i[this.pos++];if(n<128)return n;let r=n&127,s;return s=i[this.pos++],r|=(s&127)<<7,s<128||(s=i[this.pos++],r|=(s&127)<<14,s<128)||(s=i[this.pos++],r|=(s&127)<<21,s<128)?r:(s=i[this.pos],r|=(s&15)<<28,T(r,t,this))}readSVarint(){let t=this.readVarint();return t%2===1?(t+1)/-2:t/2}readBoolean(){return!!this.readVarint()}readString(){let t=this.readVarint()+this.pos,i=this.pos;return this.pos=t,t-i>=M&&_?_.decode(this.buf.subarray(i,t)):I(this.buf,i,t)}readBytes(){let t=this.readVarint()+this.pos,i=this.buf.subarray(this.pos,t);return this.pos=t,i}readPackedVarint(t=[],i){let n=this.readPackedEnd();for(;this.pos<n;)t.push(this.readVarint(i));return t}readPackedSVarint(t=[]){let i=this.readPackedEnd();for(;this.pos<i;)t.push(this.readSVarint());return t}readPackedBoolean(t=[]){let i=this.readPackedEnd();for(;this.pos<i;)t.push(this.readBoolean());return t}readPackedFloat(t=[]){let i=this.readPackedEnd();for(;this.pos<i;)t.push(this.readFloat());return t}readPackedDouble(t=[]){let i=this.readPackedEnd();for(;this.pos<i;)t.push(this.readDouble());return t}readPackedFixed32(t=[]){let i=this.readPackedEnd();for(;this.pos<i;)t.push(this.readFixed32());return t}readPackedSFixed32(t=[]){let i=this.readPackedEnd();for(;this.pos<i;)t.push(this.readSFixed32());return t}readPackedFixed64(t=[]){let i=this.readPackedEnd();for(;this.pos<i;)t.push(this.readFixed64());return t}readPackedSFixed64(t=[]){let i=this.readPackedEnd();for(;this.pos<i;)t.push(this.readSFixed64());return t}readPackedEnd(){return this.type===S?this.readVarint()+this.pos:this.pos+1}nextField(t=this.length){if(this.pos===this._valueStart&&this.skip(this.type),this.pos>=t)return 0;let i=this.readVarint();return this.type=i&7,this._valueStart=this.pos,i>>>3}skip(t){let i=t&7;if(i===E)for(;this.buf[this.pos++]>127;);else if(i===S)this.pos=this.readVarint()+this.pos;else if(i===D)this.pos+=4;else if(i===B)this.pos+=8;else throw new Error(`Unimplemented type: ${i}`)}};function T(e,t,i){let n=i.buf,r,s;if(s=n[i.pos++],r=(s&112)>>4,s<128||(s=n[i.pos++],r|=(s&127)<<3,s<128)||(s=n[i.pos++],r|=(s&127)<<10,s<128)||(s=n[i.pos++],r|=(s&127)<<17,s<128)||(s=n[i.pos++],r|=(s&127)<<24,s<128)||(s=n[i.pos++],r|=(s&1)<<31,s<128))return c(e,r,t);throw new Error("Expected varint not more than 10 bytes")}function c(e,t,i){return i?t*4294967296+(e>>>0):(t>>>0)*4294967296+(e>>>0)}function I(e,t,i){let n="",r=t;for(;r<i;){let s=e[r],h=null,o=s>239?4:s>223?3:s>191?2:1;if(r+o>i)break;let a,d,l;o===1?s<128&&(h=s):o===2?(a=e[r+1],(a&192)===128&&(h=(s&31)<<6|a&63,h<=127&&(h=null))):o===3?(a=e[r+1],d=e[r+2],(a&192)===128&&(d&192)===128&&(h=(s&15)<<12|(a&63)<<6|d&63,(h<=2047||h>=55296&&h<=57343)&&(h=null))):o===4&&(a=e[r+1],d=e[r+2],l=e[r+3],(a&192)===128&&(d&192)===128&&(l&192)===128&&(h=(s&15)<<18|(a&63)<<12|(d&63)<<6|l&63,(h<=65535||h>=1114112)&&(h=null))),h===null?(h=65533,o=1):h>65535&&(h-=65536,n+=String.fromCharCode(h>>>10&1023|55296),h=56320|h&1023),n+=String.fromCharCode(h),r+=o}return n}window.MVT={VectorTile:F,Pbf:p};})();
+</script>
 <script>
 'use strict';
 /* ============================================================
    Ride Map — personal "roads I've ridden" tracker
-   - Road mode: tap → Overpass lookup → highlight junction-to-junction slice of nearest OSM way
+   - Road mode: tap → OpenFreeMap vector tiles → highlight junction-to-junction slice of the nearest road
    - Freehand mode: hand-drawn lines for unmapped tracks
    - GPX / GeoJSON import, GeoJSON export
    - Storage: localStorage + optional private GitHub Gist sync (merge with tombstones)
@@ -199,15 +202,6 @@ if (typeof L === 'undefined') {
 /* ---------- constants ---------- */
 const LS_DATA = 'ridemap.v1.data', LS_SET = 'ridemap.v1.settings', LS_VIEW = 'ridemap.v1.view';
 const GIST_FILE = 'ridemap.geojson';
-const OVERPASS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter'
-];
-const OP_TIMEOUT = 25000;   // per-server request limit
-const OP_STAGGER = 4000;    // start the next server if the current one hasn't answered by then
-const JUNCTION_RANGE = 2500; // metres around the tap searched for junctions (keeps queries light)
 const MIN_ROAD_ZOOM = 14;          // below this, tap radius gets too large for a sensible pick
 const TAP_PX = 22;                 // tap tolerance in screen pixels
 const TOMBSTONE_TTL = 365 * 864e5; // forget deletions after a year
@@ -220,8 +214,6 @@ const CLASSES = {
   free:  {label:'Freehand',           color:'#0c8599'},
   gpx:   {label:'GPX track',          color:'#e8b500'}
 };
-// highway values that are never rideable lines
-const SKIP_HW = new Set(['proposed','construction','abandoned','disused','platform','bus_stop','elevator','corridor','services','rest_area','razed']);
 
 /* ---------- small utilities ---------- */
 const $ = id => document.getElementById(id);
@@ -426,117 +418,271 @@ function renderStats() {
 function setSheet(open) { $('sheetToggle').setAttribute('aria-expanded', String(open)); $('sheetBody').hidden = !open; }
 $('sheetToggle').onclick = () => setSheet($('sheetBody').hidden);
 
-/* ---------- Overpass ---------- */
+/* ---------- road network from OpenFreeMap vector tiles ----------
+   Tap → load 3×3 block of z14 tiles around the tap → build a road graph in a global integer grid
+   (z14 × 4096 units, ~0.6 m per unit at the equator) → walk from the tapped edge to the nearest
+   junctions (vertex degree ≠ 2) or a change of road class. */
 let busy = false;
 function setBusy(b) { busy = b; $('spinner').hidden = !b; }
 
-/* Staggered race: start the preferred server; if it hasn't answered in OP_STAGGER ms (or fails fast),
-   start the next. First good answer wins and the rest are aborted. All failure reasons are reported. */
-let opPreferred = 0;
-function overpass(query) {
-  return new Promise((resolve, reject) => {
-    const order = OVERPASS.map((_, i) => (i + opPreferred) % OVERPASS.length);
-    const ctls = [], errs = [];
-    let next = 0, failed = 0, done = false, staggerTimer = null;
-    const launch = () => {
-      clearTimeout(staggerTimer);
-      if (done || next >= order.length) return;
-      const idx = order[next++], url = OVERPASS[idx], host = new URL(url).host;
-      const ctl = new AbortController(); ctls.push(ctl);
-      const t = setTimeout(() => ctl.abort(), OP_TIMEOUT);
-      staggerTimer = setTimeout(launch, OP_STAGGER);
-      fetch(url, {method:'POST', body:'data=' + encodeURIComponent(query),
-        headers:{'Content-Type':'application/x-www-form-urlencoded'}, signal:ctl.signal})
-        .then(async res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}` + (res.status === 429 ? ' rate limited' : res.status === 504 ? ' overloaded' : ''));
-          const j = await res.json();
-          // Overpass reports query-side failures as HTTP 200 with a "remark"
-          if (j.remark && /error|timed out|out of memory/i.test(j.remark) && !(j.elements || []).length) throw new Error('server error: ' + j.remark.slice(0, 60));
-          if (done) return;
-          done = true; opPreferred = idx; clearTimeout(staggerTimer);
-          ctls.forEach(c => c !== ctl && c.abort());
-          resolve(j);
-        })
-        .catch(e => {
-          if (done) return;
-          errs.push(host + ': ' + (e.name === 'AbortError' ? `no answer in ${OP_TIMEOUT / 1000} s` : (e.message === 'Failed to fetch' || e.message === 'Load failed' ? 'blocked or unreachable' : e.message)));
-          if (++failed === order.length) { done = true; clearTimeout(staggerTimer); reject(new Error('Road lookup failed. ' + errs.join(' · ') + '. Wait about 30 s and tap again.')); }
-          else launch(); // fail fast → try the next server right away
-        })
-        .finally(() => clearTimeout(t));
-    };
-    launch();
-  });
+const TILEJSON_URL = 'https://tiles.openfreemap.org/planet';
+const TZ = 14, EXT = 4096, WORLD = EXT * (1 << TZ);
+const SNAP = 1.5;   // grid units within which two vertices are the same point (tile-edge seams)
+const TEE = 2.5;    // grid units within which a dead end touching another road counts as a T-junction
+const OMT_CLASS = {motorway:'major', trunk:'major', primary:'main', secondary:'main', tertiary:'main',
+  minor:'local', service:'local', busway:'local', raceway:'local', track:'track', path:'path'};
+let tileTemplate = null;
+const tileCache = new Map();          // "x/y" → Promise<{lines, names}>
+let graphCache = {key:'', g:null};    // graph of the last 3×3 block
+
+function lonLatToG(lon, lat) {
+  const s = Math.sin(lat * Math.PI / 180);
+  return [(lon + 180) / 360 * WORLD, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * WORLD];
+}
+function gToLonLat(x, y) {
+  const n = Math.PI - 2 * Math.PI * y / WORLD;
+  return [x / WORLD * 360 - 180, 180 / Math.PI * Math.atan(Math.sinh(n))];
+}
+function distSeg(px, py, ax, ay, bx, by) { // returns [distance, t along segment]
+  const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+  let t = L ? ((px - ax) * dx + (py - ay) * dy) / L : 0;
+  t = Math.max(0, Math.min(1, t));
+  const qx = ax + t * dx - px, qy = ay + t * dy - py;
+  return [Math.sqrt(qx * qx + qy * qy), t];
 }
 
-function classify(hw) {
-  hw = String(hw || '').replace(/_link$/, '');
-  if (hw === 'motorway' || hw === 'trunk') return 'major';
-  if (hw === 'primary' || hw === 'secondary' || hw === 'tertiary') return 'main';
-  if (hw === 'track') return 'track';
-  if (['path','footway','bridleway','cycleway','steps','pedestrian','via_ferrata'].includes(hw)) return 'path';
-  return 'local';
+// Liang–Barsky clip of one segment to a box; null when outside
+function clipSeg(a, b, x0, y0, x1, y1) {
+  let t0 = 0, t1 = 1;
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const p = [-dx, dx, -dy, dy], q = [a[0] - x0, x1 - a[0], a[1] - y0, y1 - a[1]];
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) { if (q[i] < 0) return null; }
+    else { const r = q[i] / p[i]; if (p[i] < 0) { if (r > t1) return null; if (r > t0) t0 = r; } else { if (r < t0) return null; if (r < t1) t1 = r; } }
+  }
+  const s = [[a[0] + t0 * dx, a[1] + t0 * dy], [a[0] + t1 * dx, a[1] + t1 * dy]];
+  s.cutEnd = t1 < 1;
+  return s;
+}
+// clip a polyline to a box; tiles carry a buffer beyond their edge, which would otherwise duplicate roads
+function clipLine(pts, x0, y0, x1, y1) {
+  const out = []; let cur = null;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const s = clipSeg(pts[i], pts[i + 1], x0, y0, x1, y1);
+    if (!s || (s[0][0] === s[1][0] && s[0][1] === s[1][1])) { cur = null; continue; }
+    const last = cur && cur[cur.length - 1];
+    if (last && last[0] === s[0][0] && last[1] === s[0][1]) cur.push(s[1]);
+    else { cur = [s[0], s[1]]; out.push(cur); }
+    if (s.cutEnd) cur = null;
+  }
+  return out;
 }
 
-/* Pure: given ways (Map id→{nodes, geometry, tags}), chosen way id and segment index i (between nodes i and i+1),
-   return [lo, hi] node indices of the junction-bounded slice. Junction = node shared with another highway way. */
-// isBoundary(k) lets the caller stop the slice at node k (used to cap slices at the junction search range)
-function junctionSlice(ways, wayId, i, isBoundary = () => false) {
-  const cnt = new Map();
-  for (const w of ways.values()) for (const n of new Set(w.nodes || [])) cnt.set(n, (cnt.get(n) || 0) + 1);
-  const N = ways.get(wayId).nodes;
-  let lo = i, hi = i + 1;
-  while (lo > 0 && (cnt.get(N[lo]) || 0) < 2 && !isBoundary(lo)) lo--;
-  while (hi < N.length - 1 && (cnt.get(N[hi]) || 0) < 2 && !isBoundary(hi)) hi++;
-  return [lo, hi];
+function decodeTile(buf, tx, ty) {
+  const vt = new MVT.VectorTile(new MVT.Pbf(buf));
+  const ox = tx * EXT, oy = ty * EXT, lines = [], names = [];
+  const tr = vt.layers.transportation;
+  if (tr) {
+    const k = EXT / tr.extent;
+    for (let i = 0; i < tr.length; i++) {
+      const f = tr.feature(i);
+      if (f.type !== 2) continue;
+      const p = f.properties, cls = OMT_CLASS[p.class];
+      if (!cls) continue; // rail, ferry, construction, etc.
+      const raw = p.subclass && p.subclass !== p.class ? p.class + '/' + p.subclass : String(p.class);
+      for (const ring of f.loadGeometry()) {
+        const pts = ring.map(q => [ox + q.x * k, oy + q.y * k]);
+        for (const piece of clipLine(pts, ox, oy, ox + EXT, oy + EXT)) lines.push({cls, raw, pts:piece});
+      }
+    }
+  }
+  const tn = vt.layers.transportation_name;
+  if (tn) {
+    const k = EXT / tn.extent;
+    for (let i = 0; i < tn.length; i++) {
+      const f = tn.feature(i);
+      if (f.type !== 2) continue;
+      const p = f.properties, name = p.name_en || p['name:latin'] || p.name || p.ref || '';
+      if (!name) continue;
+      for (const ring of f.loadGeometry()) names.push({name:String(name), pts:ring.map(q => [ox + q.x * k, oy + q.y * k])});
+    }
+  }
+  return {lines, names};
+}
+
+async function fetchT(url, ms) {
+  const host = new URL(url).host, ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms);
+  try { return await fetch(url, {signal:ctl.signal}); }
+  catch (e) { throw new Error(e.name === 'AbortError' ? `no answer from ${host} in ${ms / 1000} s` : `cannot reach ${host} (${e.message === 'Failed to fetch' || e.message === 'Load failed' ? 'blocked or offline' : e.message})`); }
+  finally { clearTimeout(t); }
+}
+async function getTemplate(force) {
+  if (tileTemplate && !force) return tileTemplate;
+  const r = await fetchT(TILEJSON_URL, 15000);
+  if (!r.ok) throw new Error(`map tile index (${TILEJSON_URL}) returned HTTP ${r.status}`);
+  const j = await r.json();
+  if (!Array.isArray(j.tiles) || !j.tiles[0]) throw new Error('map tile index has no tile URL');
+  return (tileTemplate = j.tiles[0]);
+}
+async function tileBytes(r) {
+  let buf = new Uint8Array(await r.arrayBuffer());
+  // some hosts send gzip bytes without a Content-Encoding header
+  if (buf[0] === 0x1f && buf[1] === 0x8b) {
+    if (typeof DecompressionStream === 'undefined') throw new Error('map tile is gzip-compressed and this browser cannot unpack it');
+    buf = new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  }
+  return buf;
+}
+function loadTile(x, y) {
+  const key = x + '/' + y;
+  if (!tileCache.has(key)) {
+    const url = tpl => tpl.replace('{z}', TZ).replace('{x}', x).replace('{y}', y);
+    const p = (async () => {
+      let r = await fetchT(url(await getTemplate(false)), 20000);
+      if (r.status === 404) r = await fetchT(url(await getTemplate(true)), 20000); // tile set version rolled over
+      if (r.status === 204 || r.status === 404) return {lines:[], names:[]};      // empty area (sea)
+      if (!r.ok) throw new Error(`map tile ${TZ}/${x}/${y} returned HTTP ${r.status}`);
+      try { return decodeTile(await tileBytes(r), x, y); }
+      catch (e) { throw new Error(`map tile ${TZ}/${x}/${y} could not be read: ${e.message}`); }
+    })();
+    p.catch(() => tileCache.delete(key));
+    tileCache.set(key, p);
+    if (tileCache.size > 81) tileCache.delete(tileCache.keys().next().value);
+  }
+  return tileCache.get(key);
+}
+
+function buildGraph(tiles) {
+  const vx = [], vy = [], vgrid = new Map(), C = 4;
+  const cellKey = (cx, cy) => cx * 33554432 + cy;
+  const vid = (x, y) => {
+    const cx = Math.floor(x / C), cy = Math.floor(y / C);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const a = vgrid.get(cellKey(cx + i, cy + j));
+      if (a) for (const id of a) if (Math.abs(vx[id] - x) <= SNAP && Math.abs(vy[id] - y) <= SNAP) return id;
+    }
+    const id = vx.length; vx.push(x); vy.push(y);
+    const k = cellKey(cx, cy); (vgrid.get(k) || vgrid.set(k, []).get(k)).push(id);
+    return id;
+  };
+  const edges = [], seen = new Set(), adj = [];
+  const EC = 128, eidx = new Map();
+  const indexEdge = ei => {
+    const e = edges[ei];
+    const x0 = Math.floor((Math.min(vx[e.a], vx[e.b]) - TEE) / EC), x1 = Math.floor((Math.max(vx[e.a], vx[e.b]) + TEE) / EC);
+    const y0 = Math.floor((Math.min(vy[e.a], vy[e.b]) - TEE) / EC), y1 = Math.floor((Math.max(vy[e.a], vy[e.b]) + TEE) / EC);
+    for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) { const k = cellKey(cx, cy); (eidx.get(k) || eidx.set(k, []).get(k)).push(ei); }
+  };
+  const addEdge = (a, b, cls, raw) => {
+    if (a === b) return;
+    const key = a < b ? a + ':' + b : b + ':' + a;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const ei = edges.length; edges.push({a, b, cls, raw, dead:false});
+    (adj[a] || (adj[a] = [])).push(ei); (adj[b] || (adj[b] = [])).push(ei);
+    indexEdge(ei);
+  };
+  for (const t of tiles) for (const l of t.lines) {
+    let prev = vid(l.pts[0][0], l.pts[0][1]);
+    for (let i = 1; i < l.pts.length; i++) { const cur = vid(l.pts[i][0], l.pts[i][1]); addEdge(prev, cur, l.cls, l.raw); prev = cur; }
+  }
+  // T-junctions: a dead end lying on another road's segment (the shared vertex was simplified away)
+  const nV = vx.length;
+  for (let v = 0; v < nV; v++) {
+    if (!adj[v] || adj[v].length !== 1) continue;
+    const cand = eidx.get(cellKey(Math.floor(vx[v] / EC), Math.floor(vy[v] / EC))) || [];
+    let best = -1, bestD = TEE;
+    for (const ei of cand) {
+      const e = edges[ei];
+      if (e.dead || e.a === v || e.b === v) continue;
+      const [d, t] = distSeg(vx[v], vy[v], vx[e.a], vy[e.a], vx[e.b], vy[e.b]);
+      if (d <= bestD && t > 0.001 && t < 0.999) { best = ei; bestD = d; }
+    }
+    if (best < 0) continue;
+    const e = edges[best]; e.dead = true;
+    adj[e.a] = adj[e.a].filter(i => i !== best); adj[e.b] = adj[e.b].filter(i => i !== best);
+    seen.delete(e.a < e.b ? e.a + ':' + e.b : e.b + ':' + e.a);
+    addEdge(e.a, v, e.cls, e.raw); addEdge(v, e.b, e.cls, e.raw);
+  }
+  return {vx, vy, edges, adj, eidx, EC, cellKey};
+}
+
+// nearest edge to (x,y) within tol, then extend both ways to junctions / class changes
+function sliceAt(g, x, y, tol) {
+  const {vx, vy, edges, adj, eidx, EC, cellKey} = g;
+  let best = -1, bestD = tol, bestT = 0;
+  const r = Math.ceil(tol / EC), cx = Math.floor(x / EC), cy = Math.floor(y / EC), checked = new Set();
+  for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) for (const ei of eidx.get(cellKey(cx + i, cy + j)) || []) {
+    if (checked.has(ei)) continue; checked.add(ei);
+    const e = edges[ei]; if (e.dead) continue;
+    const [d, t] = distSeg(x, y, vx[e.a], vy[e.a], vx[e.b], vy[e.b]);
+    if (d < bestD) { best = ei; bestD = d; bestT = t; }
+  }
+  if (best < 0) return null;
+  const e0 = edges[best], cls = e0.cls;
+  const walk = (from, start) => {
+    const path = [], visited = new Set([from]);
+    let v = start, prevE = best;
+    while (path.length < 50000) {
+      path.push(v);
+      if (visited.has(v)) break; // closed loop
+      visited.add(v);
+      const live = adj[v] || [];
+      if (live.length !== 2) break; // junction or dead end
+      const nxt = live[0] === prevE ? live[1] : live[0], ne = edges[nxt];
+      if (ne.cls !== cls) break;    // road class changes here
+      prevE = nxt; v = ne.a === v ? ne.b : ne.a;
+    }
+    return path;
+  };
+  const fwd = walk(e0.a, e0.b);
+  let ids;
+  if (fwd[fwd.length - 1] === e0.a) ids = [e0.a, ...fwd]; // ring with no junctions
+  else ids = [...walk(e0.b, e0.a).reverse(), ...fwd];
+  return {pts: ids.map(v => [vx[v], vy[v]]), cls, raw:e0.raw,
+    at:[vx[e0.a] + bestT * (vx[e0.b] - vx[e0.a]), vy[e0.a] + bestT * (vy[e0.b] - vy[e0.a])]};
+}
+
+function nearestName(tiles, x, y, maxD = 40) {
+  let best = '', bestD = maxD;
+  for (const t of tiles) for (const n of t.names) for (let i = 0; i < n.pts.length - 1; i++) {
+    const [d] = distSeg(x, y, n.pts[i][0], n.pts[i][1], n.pts[i + 1][0], n.pts[i + 1][1]);
+    if (d < bestD) { bestD = d; best = n.name; }
+  }
+  return best;
 }
 
 async function onRoadTap(latlng) {
-  if (map.getZoom() < MIN_ROAD_ZOOM) { toast(`Zoom in to level ${MIN_ROAD_ZOOM}+ to pick a road (now ${map.getZoom()}).`, 'warn'); return; }
-  if (busy) { toast('Still looking up the last tap…', 'warn', 1800); return; }
+  if (map.getZoom() < MIN_ROAD_ZOOM) { toast(`Zoom in to level ${MIN_ROAD_ZOOM}+ to pick a road (now ${Math.round(map.getZoom())}).`, 'warn'); return; }
+  if (busy) { toast('Still loading the last tap…', 'warn', 1800); return; }
   setBusy(true);
   const pulse = L.circleMarker(latlng, {radius:9, color:'#0b7285', weight:2, fillOpacity:.2, interactive:false}).addTo(map);
   try {
-    const p0 = map.latLngToContainerPoint(latlng);
-    const radius = Math.min(80, Math.max(8, Math.round(map.distance(latlng, map.containerPointToLatLng(p0.add([TAP_PX, 0]))))));
-    const lat = latlng.lat.toFixed(6), lon = latlng.lng.toFixed(6);
-    // only nodes within JUNCTION_RANGE are checked for junctions, so long trunk roads stay cheap to query
-    const q = `[out:json][timeout:20];way(around:${radius},${lat},${lon})["highway"]->.c;.c out body geom;node(w.c)(around:${JUNCTION_RANGE},${lat},${lon})->.n;way(bn.n)["highway"]->.x;.x out skel;`;
-    const json = await overpass(q);
-    const ways = new Map();
-    for (const el of json.elements || []) {
-      if (el.type !== 'way' || !Array.isArray(el.nodes)) continue;
-      const w = ways.get(el.id) || {id:el.id};
-      w.nodes = el.nodes;
-      if (el.geometry) { w.geometry = el.geometry; w.tags = el.tags || {}; }
-      ways.set(el.id, w);
+    const [gx, gy] = lonLatToG(latlng.lng, latlng.lat);
+    const tx = Math.floor(gx / EXT), ty = Math.floor(gy / EXT), key = tx + '/' + ty;
+    const coordsXY = [];
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) coordsXY.push([tx + i, ty + j]);
+    const tiles = await Promise.all(coordsXY.map(([x, y]) => loadTile(x, y)));
+    if (graphCache.key !== key) graphCache = {key, g:buildGraph(tiles)};
+    // tap tolerance in grid units: screen px × (grid units per px at the current zoom)
+    const tol = TAP_PX * 1.6 * (EXT / 256) * Math.pow(2, TZ - map.getZoom());
+    const s = sliceAt(graphCache.g, gx, gy, tol);
+    if (!s) { toast('No mapped road or path at that spot. Tap closer to the line, or use Freehand.', 'warn'); return; }
+    const coords = [];
+    for (const [x, y] of s.pts) {
+      const [lon, lat] = gToLonLat(x, y), c = [r5(lon), r5(lat)], last = coords[coords.length - 1];
+      if (!last || last[0] !== c[0] || last[1] !== c[1]) coords.push(c);
     }
-    // nearest candidate segment in screen pixels
-    let best = null;
-    for (const w of ways.values()) {
-      if (!w.geometry || SKIP_HW.has(w.tags.highway) || w.geometry.length !== w.nodes.length) continue;
-      const pts = w.geometry.map(g => g ? map.latLngToContainerPoint([g.lat, g.lon]) : null);
-      for (let i = 0; i < pts.length - 1; i++) {
-        if (!pts[i] || !pts[i + 1]) continue;
-        const d = L.LineUtil.pointToSegmentDistance(p0, pts[i], pts[i + 1]);
-        if (!best || d < best.d) best = {d, w, i};
-      }
-    }
-    if (!best || best.d > TAP_PX * 1.6) { toast('No mapped road or path at that spot. Tap closer to the line, or use Freehand.', 'warn'); return; }
-    // beyond the searched range junctions are unknown, so cap the slice just inside it
-    const tap = [latlng.lng, latlng.lat], G = best.w.geometry;
-    const [lo, hi] = junctionSlice(ways, best.w.id, best.i, k => hav([G[k].lon, G[k].lat], tap) > JUNCTION_RANGE - 100);
-    const N = best.w.nodes, t = best.w.tags;
-    const id = `w${best.w.id}:${N[lo]}-${N[hi]}`;
+    const ends = [coords[0].join(','), coords[coords.length - 1].join(',')].sort().join('|');
+    const id = 't' + hash(ends + '|' + s.cls + '|' + coords.length);
     if (layers.has(id)) { openFeaturePopup(id, latlng); return; }
-    const coords = best.w.geometry.slice(lo, hi + 1).map(g => [r5(g.lon), r5(g.lat)]);
     const f = normalizeFeature({type:'Feature', geometry:{type:'LineString', coordinates:coords},
-      properties:{id, kind:'osm', cls:classify(t.highway), hw:t.highway, name:t.name || t['name:en'] || t.ref || '', way:best.w.id, added:Date.now()}});
-    if (!f) { toast('That road slice had no usable geometry. Try tapping a different part of it.', 'warn'); return; }
+      properties:{id, kind:'osm', cls:s.cls, hw:s.raw, name:nearestName(tiles, s.at[0], s.at[1]), added:Date.now()}});
+    if (!f) { toast('That road piece had no usable shape. Try tapping a different part of it.', 'warn'); return; }
     addFeatures([f]);
     toast(`Added ${f.properties.name || CLASSES[f.properties.cls].label} · ${fmtKm(f.properties.m)} km`, '', 3000, {label:'Undo', fn:undo});
   } catch (e) {
-    toast(e.message, 'err', 7000);
+    toast('Road lookup failed: ' + e.message + '. Check your connection and tap again.', 'err', 7000);
   } finally {
     map.removeLayer(pulse); setBusy(false);
   }
@@ -801,6 +947,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ---------- boot ---------- */
+if (typeof MVT === 'undefined') toast('Map tile decoder failed to load. Road mode will not work; reload the page.', 'err', 10000);
 syncLayersToStore();
 renderStats();
 setSheet(window.innerWidth > 700);
