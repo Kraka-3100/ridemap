@@ -384,9 +384,15 @@ const statusColor = () => settings.status === 'planned' ? PLANNED_COLOR : RIDDEN
 const view = lsGet(LS_VIEW, {c:[4.6, 101.6], z:7, base:'Hybrid (satellite + labels)'});
 if (!view.hybridDefault) { view.base = 'Hybrid (satellite + labels)'; view.hybridDefault = 1; } // one-time switch to the new default
 const map = L.map('map', {zoomControl:false, worldCopyJump:true}).setView(view.c, view.z);
-// separate panes/canvases so ridden roads always draw on top of planned ones
+// separate panes/canvases: all outlines sit under all coloured lines, so joined pieces read as one
+// continuous line (no dark beads at every junction); ridden roads always draw above planned ones
+map.createPane('plannedCasing').style.zIndex = 405;
 map.createPane('planned').style.zIndex = 410;
+map.createPane('riddenCasing').style.zIndex = 415;
 map.createPane('ridden').style.zIndex = 420;
+for (const n of ['plannedCasing', 'riddenCasing']) map.getPane(n).style.pointerEvents = 'none';
+const plannedCasingRenderer = L.canvas({pane:'plannedCasing'});
+const riddenCasingRenderer = L.canvas({pane:'riddenCasing'});
 const plannedRenderer = L.canvas({tolerance:10, pane:'planned'});
 const riddenRenderer = L.canvas({tolerance:10, pane:'ridden'});
 // Tile layer that also loads a margin of tiles beyond the screen edge, loads while panning,
@@ -432,7 +438,7 @@ function drawFeature(f) {
   if (layers.has(p.id)) return;
   const ll = f.geometry.coordinates.map(c => [c[1], c[0]]);
   const planned = p.status === 'planned', renderer = planned ? plannedRenderer : riddenRenderer;
-  const casing = L.polyline(ll, {renderer, color:'#000', weight:8, opacity:planned ? .2 : .35, interactive:false, lineCap:'round', lineJoin:'round'});
+  const casing = L.polyline(ll, {renderer:planned ? plannedCasingRenderer : riddenCasingRenderer, color:'#000', weight:8, opacity:planned ? .2 : .35, interactive:false, lineCap:'round', lineJoin:'round'});
   const line = L.polyline(ll, {renderer, color:planned ? PLANNED_COLOR : RIDDEN_COLOR, weight:5, opacity:.95, lineCap:'round', lineJoin:'round', dashArray:planned ? '10 8' : null});
   line.on('click', e => { suppressMapClickUntil = Date.now() + 400; L.DomEvent.stop(e); openFeaturePopup(p.id, e.latlng); });
   const g = L.layerGroup([casing, line]).addTo(planned ? plannedGroup : riddenGroup);
