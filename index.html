@@ -119,6 +119,7 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
   <div class="brand">RIDE<span>MAP</span></div>
   <div class="seg" role="radiogroup" aria-label="Drawing mode">
     <button id="modeRoad" class="on" role="radio" aria-checked="true">Road</button>
+    <button id="modeRoute" role="radio" aria-checked="false">Route</button>
     <button id="modeFree" role="radio" aria-checked="false">Freehand</button>
   </div>
   <form id="searchForm" class="search" role="search"><input id="searchInput" type="search" placeholder="Search place (MY / TH)" autocomplete="off" enterkeyhint="search"></form>
@@ -140,6 +141,15 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
   </div>
 </div>
 
+<div id="routebar" class="drawbar" hidden>
+  <div class="drawinfo"><b id="routeLen">0.00 km</b> · <span id="routeInfo">tap your start point</span></div>
+  <div class="row">
+    <button id="routeUndo" class="btn">Undo point</button>
+    <button id="routeCancel" class="btn">Cancel</button>
+    <button id="routeSave" class="btn primary">Save route</button>
+  </div>
+</div>
+
 <section class="sheet">
   <button class="sheet-head" id="sheetToggle" aria-expanded="false" aria-controls="sheetBody">
     <span class="total"><b id="totalKm">0.0</b> km</span>
@@ -155,7 +165,7 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
       <button id="btnExport" class="btn">Export GeoJSON</button>
       <button id="btnSettings" class="btn">Sync settings</button>
     </div>
-    <p class="hint">Road mode: tap a road to highlight it between the nearest junctions. Tap a highlight to see or remove it. Use Freehand for tracks that aren't on the map.</p>
+    <p class="hint">Road mode: tap a road to highlight it between the nearest junctions. Tap a highlight to see or remove it. Route mode: tap your start, then each turn-off point; the roads between are found for you. Use Freehand for tracks that aren't on the map.</p>
   </div>
 </section>
 
@@ -607,9 +617,9 @@ function buildGraph(tiles) {
   return {vx, vy, edges, adj, eidx, EC, cellKey};
 }
 
-// nearest edge to (x,y) within tol, then extend both ways to junctions / class changes
-function sliceAt(g, x, y, tol) {
-  const {vx, vy, edges, adj, eidx, EC, cellKey} = g;
+// nearest live edge to (x,y) within tol → {ei, t, x, y, d} (x,y = snapped point on the edge) or null
+function nearestEdge(g, x, y, tol) {
+  const {vx, vy, edges, eidx, EC, cellKey} = g;
   let best = -1, bestD = tol, bestT = 0;
   const r = Math.ceil(tol / EC), cx = Math.floor(x / EC), cy = Math.floor(y / EC), checked = new Set();
   for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) for (const ei of eidx.get(cellKey(cx + i, cy + j)) || []) {
@@ -619,6 +629,32 @@ function sliceAt(g, x, y, tol) {
     if (d < bestD) { best = ei; bestD = d; bestT = t; }
   }
   if (best < 0) return null;
+  const e = edges[best];
+  return {ei:best, t:bestT, d:bestD, x:vx[e.a] + bestT * (vx[e.b] - vx[e.a]), y:vy[e.a] + bestT * (vy[e.b] - vy[e.a])};
+}
+
+// one ID rule for road segments: junction-bounded pieces get the same ID whether tapped or routed,
+// so the same road is never stored twice; partial pieces (route start/end mid-road) get their own
+function segId(coords, cls, full) {
+  const ends = [coords[0].join(','), coords[coords.length - 1].join(',')].sort().join('|');
+  return (full ? 't' : 'r') + hash(ends + '|' + cls + '|' + coords.length);
+}
+// grid points → rounded [lon,lat] with consecutive duplicates removed
+function gToCoords(pts) {
+  const coords = [];
+  for (const [x, y] of pts) {
+    const [lon, lat] = gToLonLat(x, y), c = [r5(lon), r5(lat)], last = coords[coords.length - 1];
+    if (!last || last[0] !== c[0] || last[1] !== c[1]) coords.push(c);
+  }
+  return coords;
+}
+
+// nearest edge to (x,y) within tol, then extend both ways to junctions / class changes
+function sliceAt(g, x, y, tol) {
+  const {vx, vy, edges, adj} = g;
+  const hit = nearestEdge(g, x, y, tol);
+  if (!hit) return null;
+  const best = hit.ei, bestT = hit.t;
   const e0 = edges[best], cls = e0.cls;
   const walk = (from, start) => {
     const path = [], visited = new Set([from]);
@@ -668,13 +704,9 @@ async function onRoadTap(latlng) {
     const tol = TAP_PX * 1.6 * (EXT / 256) * Math.pow(2, TZ - map.getZoom());
     const s = sliceAt(graphCache.g, gx, gy, tol);
     if (!s) { toast('No mapped road or path at that spot. Tap closer to the line, or use Freehand.', 'warn'); return; }
-    const coords = [];
-    for (const [x, y] of s.pts) {
-      const [lon, lat] = gToLonLat(x, y), c = [r5(lon), r5(lat)], last = coords[coords.length - 1];
-      if (!last || last[0] !== c[0] || last[1] !== c[1]) coords.push(c);
-    }
-    const ends = [coords[0].join(','), coords[coords.length - 1].join(',')].sort().join('|');
-    const id = 't' + hash(ends + '|' + s.cls + '|' + coords.length);
+    const coords = gToCoords(s.pts);
+    if (coords.length < 2) { toast('That road piece is too short to save. Try tapping a different part of it.', 'warn'); return; }
+    const id = segId(coords, s.cls, true);
     if (layers.has(id)) { openFeaturePopup(id, latlng); return; }
     const f = normalizeFeature({type:'Feature', geometry:{type:'LineString', coordinates:coords},
       properties:{id, kind:'osm', cls:s.cls, hw:s.raw, name:nearestName(tiles, s.at[0], s.at[1]), added:Date.now()}});
@@ -688,19 +720,205 @@ async function onRoadTap(latlng) {
   }
 }
 
+/* ---------- route mode ----------
+   Tap waypoints; each leg is the shortest path over the road graph of the tiles covering both points.
+   On save the route is cut into junction-to-junction pieces using the same ID rule as single taps. */
+const LEG_MAX_M = 15000;   // straight-line limit per leg (keeps tile downloads reasonable)
+const MIN_ROUTE_ZOOM = 12;
+const EPS_T = 1e-9;
+let routeGraphCache = {key:'', g:null, tiles:null};
+
+async function graphForTiles(x0, y0, x1, y1) {
+  const key = `${x0},${y0},${x1},${y1}`;
+  if (routeGraphCache.key === key) return routeGraphCache;
+  const list = [];
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) list.push(loadTile(x, y));
+  const tiles = await Promise.all(list);
+  routeGraphCache = {key, g:buildGraph(tiles), tiles};
+  return routeGraphCache;
+}
+
+class MinHeap {
+  constructor() { this.k = []; this.v = []; }
+  get size() { return this.k.length; }
+  push(k, v) {
+    const K = this.k, V = this.v; let i = K.length; K.push(k); V.push(v);
+    while (i > 0) { const p = (i - 1) >> 1; if (K[p] <= k) break; K[i] = K[p]; V[i] = V[p]; i = p; }
+    K[i] = k; V[i] = v;
+  }
+  pop() {
+    const K = this.k, V = this.v, rk = K[0], rv = V[0], lk = K.pop(), lv = V.pop();
+    if (K.length) {
+      let i = 0; const n = K.length;
+      for (;;) { const l = 2 * i + 1; if (l >= n) break; const r = l + 1, c = (r < n && K[r] < K[l]) ? r : l; if (K[c] >= lk) break; K[i] = K[c]; V[i] = V[c]; i = c; }
+      K[i] = lk; V[i] = lv;
+    }
+    return [rk, rv];
+  }
+}
+
+function edgeBetween(g, u, v) {
+  for (const ei of g.adj[u] || []) { const e = g.edges[ei]; if ((e.a === u && e.b === v) || (e.a === v && e.b === u)) return e; }
+  return null;
+}
+
+// Dijkstra between two snapped points A, B ({ei, t, x, y}); returns path points, vertex ids (-1 = snap point),
+// per-step class/raw tag and length, or null when the points aren't connected in this graph
+function routeBetween(g, A, B) {
+  const {vx, vy, edges, adj} = g;
+  const elen = e => Math.hypot(vx[e.b] - vx[e.a], vy[e.b] - vy[e.a]);
+  const eA = edges[A.ei], eB = edges[B.ei], lA = elen(eA), lB = elen(eB);
+  const n = vx.length, dist = new Float64Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), h = new MinHeap();
+  const seed = (v, d) => { if (d < dist[v]) { dist[v] = d; prev[v] = -2; h.push(d, v); } };
+  seed(eA.a, A.t * lA); seed(eA.b, (1 - A.t) * lA);
+  let best = A.ei === B.ei ? Math.abs(A.t - B.t) * lA : Infinity, bestEnd = -1;
+  const viaEnd = () => {
+    const da = dist[eB.a] + B.t * lB, db = dist[eB.b] + (1 - B.t) * lB;
+    if (da < best) { best = da; bestEnd = eB.a; }
+    if (db < best) { best = db; bestEnd = eB.b; }
+  };
+  viaEnd();
+  while (h.size) {
+    const [d, v] = h.pop();
+    if (d > dist[v]) continue;
+    if (d >= best) break;
+    for (const ei of adj[v] || []) {
+      const e = edges[ei], u = e.a === v ? e.b : e.a, nd = d + elen(e);
+      if (nd < dist[u]) { dist[u] = nd; prev[u] = v; h.push(nd, u); if (u === eB.a || u === eB.b) viaEnd(); }
+    }
+  }
+  if (!isFinite(best)) return null;
+  if (bestEnd < 0) return {pts:[[A.x, A.y], [B.x, B.y]], ids:[-1, -1], cls:[eA.cls], raw:[eA.raw], m:best};
+  const chain = [];
+  for (let v = bestEnd, guard = 0; v >= 0 && guard < n; v = prev[v], guard++) chain.push(v);
+  chain.reverse();
+  const pts = [[A.x, A.y], ...chain.map(v => [vx[v], vy[v]]), [B.x, B.y]], ids = [-1, ...chain, -1];
+  const cls = [], raw = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const e = i === 0 ? eA : i === pts.length - 2 ? eB : edgeBetween(g, ids[i], ids[i + 1]);
+    cls.push(e.cls); raw.push(e.raw);
+  }
+  return {pts, ids, cls, raw, m:best};
+}
+
+// cut a routed path at junctions (degree ≠ 2) and class changes, like single taps do
+function splitRoute(g, r) {
+  const pieces = [];
+  let cur = {pts:[r.pts[0]], cls:r.cls[0], raw:r.raw[0], startFull:false};
+  for (let i = 1; i < r.pts.length; i++) {
+    cur.pts.push(r.pts[i]);
+    if (i === r.pts.length - 1) { cur.endFull = false; pieces.push(cur); break; }
+    const v = r.ids[i];
+    if ((g.adj[v] || []).length !== 2 || r.cls[i] !== r.cls[i - 1]) {
+      cur.endFull = true; pieces.push(cur);
+      cur = {pts:[r.pts[i]], cls:r.cls[i], raw:r.raw[i], startFull:true};
+    }
+  }
+  return pieces;
+}
+
+const samePt = (a, b) => a && b && a[0] === b[0] && a[1] === b[1];
+// join pieces across waypoints that sit mid-road, so a road ridden through a waypoint
+// becomes one junction-to-junction segment again (same ID as tapping it)
+function finalizeRoute(legs) {
+  const merged = [];
+  for (const p of legs.flatMap(l => l.pieces)) {
+    const last = merged[merged.length - 1];
+    const joinable = last && !last.endFull && !p.startFull && last.cls === p.cls && samePt(last.coords[last.coords.length - 1], p.coords[0]);
+    const uTurn = joinable && p.coords.length > 1 && last.coords.length > 1 && samePt(p.coords[1], last.coords[last.coords.length - 2]);
+    if (joinable && !uTurn) {
+      // drop the waypoint's snap point when it lies mid-edge: it isn't a real road vertex
+      const head = last.endVirtual ? last.coords.slice(0, -1) : last.coords;
+      merged[merged.length - 1] = {...last, coords:[...head, ...p.coords.slice(1)], endFull:p.endFull, endVirtual:p.endVirtual};
+    } else merged.push({...p});
+  }
+  return merged.map(p => normalizeFeature({type:'Feature', geometry:{type:'LineString', coordinates:p.coords},
+    properties:{id:segId(p.coords, p.cls, p.startFull && p.endFull), kind:'osm', cls:p.cls, hw:p.raw, name:p.name, added:Date.now()}})).filter(Boolean);
+}
+
+const route = {way:[], legs:[], layer:L.layerGroup()};
+function routeRedraw() {
+  route.layer.clearLayers();
+  let m = 0;
+  for (const leg of route.legs) {
+    m += leg.m;
+    for (const p of leg.pieces) L.polyline(p.coords.map(c => [c[1], c[0]]), {color:CLASSES[p.cls].color, weight:5, opacity:.9, dashArray:'8 6', interactive:false}).addTo(route.layer);
+  }
+  route.way.forEach((w, i) => { const [lon, lat] = gToLonLat(w.x, w.y); L.circleMarker([lat, lon], {radius: i === 0 ? 7 : 5, color:'#fff', weight:2, fillColor:'#0b7285', fillOpacity:1, interactive:false}).addTo(route.layer); });
+  $('routeLen').textContent = fmtKm(m) + ' km';
+  $('routeInfo').textContent = !route.way.length ? 'tap your start point'
+    : `${route.legs.length} leg${route.legs.length === 1 ? '' : 's'} · tap the next point`;
+}
+function clearRoute() { route.way = []; route.legs = []; routeRedraw(); }
+
+async function onRouteTap(latlng) {
+  if (map.getZoom() < MIN_ROUTE_ZOOM) { toast(`Zoom in to level ${MIN_ROUTE_ZOOM}+ to place route points (now ${Math.round(map.getZoom())}).`, 'warn'); return; }
+  if (busy) { toast('Still working on the last point…', 'warn', 1800); return; }
+  setBusy(true);
+  try {
+    const [gx, gy] = lonLatToG(latlng.lng, latlng.lat);
+    const tol = TAP_PX * 1.6 * (EXT / 256) * Math.pow(2, TZ - map.getZoom());
+    if (!route.way.length) {
+      const tx = Math.floor(gx / EXT), ty = Math.floor(gy / EXT);
+      const {g} = await graphForTiles(tx - 1, ty - 1, tx + 1, ty + 1);
+      const hit = nearestEdge(g, gx, gy, tol);
+      if (!hit) { toast('No mapped road or path near that spot. Tap closer to a road.', 'warn'); return; }
+      route.way.push({x:hit.x, y:hit.y}); routeRedraw(); return;
+    }
+    const prevW = route.way[route.way.length - 1];
+    const legM = hav(gToLonLat(prevW.x, prevW.y), [latlng.lng, latlng.lat]);
+    if (legM > LEG_MAX_M) { toast(`That point is ${fmtKm(legM)} km from the last one. Add a point within ${LEG_MAX_M / 1000} km.`, 'warn', 5000); return; }
+    const x0 = Math.floor(Math.min(prevW.x, gx) / EXT) - 1, x1 = Math.floor(Math.max(prevW.x, gx) / EXT) + 1;
+    const y0 = Math.floor(Math.min(prevW.y, gy) / EXT) - 1, y1 = Math.floor(Math.max(prevW.y, gy) / EXT) + 1;
+    const {g, tiles} = await graphForTiles(x0, y0, x1, y1);
+    const A = nearestEdge(g, prevW.x, prevW.y, 8);
+    if (!A) { toast('Could not find the road under the previous point. Tap Undo point and place it again.', 'err', 6000); return; }
+    const B = nearestEdge(g, gx, gy, tol);
+    if (!B) { toast('No mapped road or path near that spot. Tap closer to a road.', 'warn'); return; }
+    const r = routeBetween(g, A, B);
+    if (!r) { toast('No road connection between those points inside the loaded area. Add a point in between.', 'warn', 5000); return; }
+    const pieces = splitRoute(g, r).map(p => {
+      const mid = p.pts[Math.floor(p.pts.length / 2)];
+      return {coords:gToCoords(p.pts), cls:p.cls, raw:p.raw, startFull:p.startFull, endFull:p.endFull, name:nearestName(tiles, mid[0], mid[1])};
+    }).filter(p => p.coords.length > 1);
+    if (!pieces.length) { toast('That point is on the same spot as the last one.', 'warn'); return; }
+    pieces[0].startVirtual = A.t > EPS_T && A.t < 1 - EPS_T;
+    pieces[pieces.length - 1].endVirtual = B.t > EPS_T && B.t < 1 - EPS_T;
+    route.legs.push({pieces, m:pieces.reduce((s, p) => s + lineM(p.coords), 0)});
+    route.way.push({x:B.x, y:B.y});
+    routeRedraw();
+  } catch (e) {
+    toast('Routing failed: ' + e.message + '. Check your connection and tap again.', 'err', 7000);
+  } finally { setBusy(false); }
+}
+function saveRoute() {
+  if (!route.legs.length) { toast('Place at least two points to make a route.', 'warn'); return; }
+  const feats = finalizeRoute(route.legs);
+  const before = store.features.length;
+  const added = addFeatures(feats);
+  const m = added.reduce((s, f) => s + f.properties.m, 0);
+  const skipped = feats.length - added.length;
+  toast(`Saved route · ${added.length} new segment${added.length === 1 ? '' : 's'} · ${fmtKm(m)} km${skipped ? ` · ${skipped} already highlighted` : ''}`, '', 4500, added.length ? {label:'Undo', fn:undo} : undefined);
+  if (store.features.length >= before) clearRoute();
+}
+$('routeUndo').onclick = () => { if (route.legs.length) route.legs.pop(); route.way.pop(); routeRedraw(); };
+$('routeCancel').onclick = () => { clearRoute(); setMode('road'); };
+$('routeSave').onclick = saveRoute;
+
 /* ---------- freehand ---------- */
 let mode = 'road';
 const draft = {pts:[], line:null, dots:L.layerGroup()};
 function setMode(m) {
   if (m === mode) return;
   if (mode === 'free' && draft.pts.length) { toast('Finish or cancel the current line first.', 'warn'); return; }
+  if (mode === 'route' && route.way.length) { toast('Save or cancel the current route first.', 'warn'); return; }
   mode = m;
-  $('modeRoad').classList.toggle('on', m === 'road'); $('modeRoad').setAttribute('aria-checked', String(m === 'road'));
-  $('modeFree').classList.toggle('on', m === 'free'); $('modeFree').setAttribute('aria-checked', String(m === 'free'));
-  map.getContainer().classList.toggle('free-mode', m === 'free');
-  $('drawbar').hidden = m !== 'free';
-  if (m === 'free') { map.doubleClickZoom.disable(); draft.dots.addTo(map); updateDraft(); }
-  else { map.doubleClickZoom.enable(); clearDraft(); map.removeLayer(draft.dots); }
+  for (const [id, k] of [['modeRoad', 'road'], ['modeRoute', 'route'], ['modeFree', 'free']]) { $(id).classList.toggle('on', m === k); $(id).setAttribute('aria-checked', String(m === k)); }
+  map.getContainer().classList.toggle('free-mode', m !== 'road');
+  $('drawbar').hidden = m !== 'free'; $('routebar').hidden = m !== 'route';
+  if (m === 'road') map.doubleClickZoom.enable(); else map.doubleClickZoom.disable(); // stray double taps shouldn't zoom while placing points
+  if (m === 'free') { draft.dots.addTo(map); updateDraft(); } else { clearDraft(); map.removeLayer(draft.dots); }
+  if (m === 'route') { route.layer.addTo(map); routeRedraw(); } else { clearRoute(); map.removeLayer(route.layer); }
 }
 function updateDraft() {
   const coords = draft.pts.map(p => [p.lng, p.lat]);
@@ -725,6 +943,7 @@ function finishDraft() {
 }
 $('modeRoad').onclick = () => setMode('road');
 $('modeFree').onclick = () => setMode('free');
+$('modeRoute').onclick = () => setMode('route');
 $('drawUndo').onclick = () => { draft.pts.pop(); updateDraft(); };
 $('drawCancel').onclick = () => { clearDraft(); setMode('road'); };
 $('drawFinish').onclick = finishDraft;
@@ -733,6 +952,7 @@ map.on('dblclick', () => { if (mode === 'free' && draft.pts.length > 1) finishDr
 map.on('click', e => {
   if (Date.now() < suppressMapClickUntil) return;
   if (mode === 'free') { draft.pts.push(e.latlng); updateDraft(); }
+  else if (mode === 'route') onRouteTap(e.latlng);
   else onRoadTap(e.latlng);
 });
 
@@ -942,8 +1162,9 @@ $('btnUndo').onclick = undo;
 document.addEventListener('keydown', e => {
   if (e.target.matches('input')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
-  else if (e.key === 'Escape') { if (!$('dlg').hidden) closeSettings(); else if (mode === 'free') { clearDraft(); setMode('road'); } }
+  else if (e.key === 'Escape') { if (!$('dlg').hidden) closeSettings(); else if (mode === 'free') { clearDraft(); setMode('road'); } else if (mode === 'route') { clearRoute(); setMode('road'); } }
   else if (e.key === 'Enter' && mode === 'free') finishDraft();
+  else if (e.key === 'Enter' && mode === 'route') saveRoute();
 });
 
 /* ---------- boot ---------- */
