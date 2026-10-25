@@ -381,28 +381,34 @@ const riddenBases = () => new Set(store.features.filter(f => f.properties.status
 const statusColor = () => settings.status === 'planned' ? PLANNED_COLOR : RIDDEN_COLOR;
 
 /* ---------- map ---------- */
-const view = lsGet(LS_VIEW, {c:[4.6, 101.6], z:7, base:'Street (OSM)'});
+const view = lsGet(LS_VIEW, {c:[4.6, 101.6], z:7, base:'Hybrid (satellite + labels)'});
+if (!view.hybridDefault) { view.base = 'Hybrid (satellite + labels)'; view.hybridDefault = 1; } // one-time switch to the new default
 const map = L.map('map', {zoomControl:false, worldCopyJump:true}).setView(view.c, view.z);
 // separate panes/canvases so ridden roads always draw on top of planned ones
 map.createPane('planned').style.zIndex = 410;
 map.createPane('ridden').style.zIndex = 420;
 const plannedRenderer = L.canvas({tolerance:10, pane:'planned'});
 const riddenRenderer = L.canvas({tolerance:10, pane:'ridden'});
+// Hybrid = Esri imagery + Esri road and place-name overlays (labels ranked by importance, like Google's hybrid view)
+const esri = (svc, attribution) => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`, {maxZoom:19, maxNativeZoom:18, attribution});
 const bases = {
+  'Hybrid (satellite + labels)': L.layerGroup([
+    esri('World_Imagery', 'Imagery &copy; Esri, Maxar, Earthstar Geographics'),
+    esri('Reference/World_Transportation', 'Roads &copy; Esri'),
+    esri('Reference/World_Boundaries_and_Places', 'Labels &copy; Esri')]),
   'Street (OSM)': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}),
   'Satellite (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18, attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics'}),
   'Topo (OpenTopoMap)': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {maxZoom:17, subdomains:'abc', attribution:'&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap (CC-BY-SA)'})
 };
-const labelsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18, attribution:'Labels &copy; Esri'});
 const riddenGroup = L.layerGroup().addTo(map);
 const plannedGroup = L.layerGroup().addTo(map);
-(bases[view.base] || bases['Street (OSM)']).addTo(map);
-L.control.layers(bases, {'Ridden roads': riddenGroup, 'Planned routes': plannedGroup, 'Place labels (for satellite)': labelsOverlay}, {position:'topright'}).addTo(map);
+(bases[view.base] || bases['Hybrid (satellite + labels)']).addTo(map);
+L.control.layers(bases, {'Ridden roads': riddenGroup, 'Planned routes': plannedGroup}, {position:'topright'}).addTo(map);
 L.control.zoom({position:'bottomright'}).addTo(map);
 L.control.scale({position:'bottomright', imperial:false}).addTo(map);
 
 let viewTimer;
-function saveView() { clearTimeout(viewTimer); viewTimer = setTimeout(() => { const c = map.getCenter(); lsSet(LS_VIEW, {c:[r5(c.lat), r5(c.lng)], z:map.getZoom(), base:view.base}); }, 600); }
+function saveView() { clearTimeout(viewTimer); viewTimer = setTimeout(() => { const c = map.getCenter(); lsSet(LS_VIEW, {c:[r5(c.lat), r5(c.lng)], z:map.getZoom(), base:view.base, hybridDefault:1}); }, 600); }
 map.on('moveend', saveView);
 map.on('baselayerchange', e => { view.base = e.name; saveView(); });
 
