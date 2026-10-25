@@ -660,8 +660,9 @@ async function pullRemote() {
   return s;
 }
 async function syncNow(manual = false) {
-  if (!settings.token || !settings.gistId) { setSyncState('', 'Sync not set up.'); if (manual) toast('Set a GitHub token and Gist ID first.', 'warn'); return; }
-  if (syncing) { syncAgain = true; return; }
+  // returns true on success, false on failure or skip (used to auto-close the settings dialog)
+  if (!settings.token || !settings.gistId) { setSyncState('err', 'Sync not set up: ' + (!settings.token ? 'GitHub token is empty.' : 'Gist ID is empty. Tap Create new Gist or paste an ID.')); if (manual) toast('Set a GitHub token and Gist ID first.', 'warn'); return false; }
+  if (syncing) { syncAgain = true; return false; }
   syncing = true; setSyncState('busy', 'Syncing…');
   try {
     const remote = await pullRemote();
@@ -674,9 +675,11 @@ async function syncNow(manual = false) {
     settings.lastSync = Date.now(); lsSet(LS_SET, settings);
     setSyncState('ok', 'Synced at ' + new Date(settings.lastSync).toLocaleTimeString() + ` · ${store.features.length} segments`);
     if (manual) toast('Synced with Gist.');
+    return true;
   } catch (e) {
     setSyncState('err', 'Sync failed: ' + e.message);
     toast('Sync failed: ' + e.message, 'err', 7000);
+    return false;
   } finally {
     syncing = false;
     if (syncAgain) { syncAgain = false; scheduleSync(); }
@@ -707,13 +710,15 @@ function closeSettings() { $('dlg').hidden = true; }
 $('btnSettings').onclick = openSettings;
 $('setClose').onclick = closeSettings;
 $('dlg').addEventListener('click', e => { if (e.target === $('dlg')) closeSettings(); });
-$('setSave').onclick = () => {
+$('setSave').onclick = async () => {
   settings.token = $('setToken').value.trim();
   settings.gistId = $('setGist').value.trim().replace(/^https?:\/\/gist\.github\.com\/[^/]+\//, '').replace(/[^0-9a-f]/gi, '');
   settings.autosync = $('setAuto').checked;
   $('setGist').value = settings.gistId;
   lsSet(LS_SET, settings);
-  syncNow(true);
+  const btn = $('setSave'); btn.disabled = true; btn.textContent = 'Syncing…';
+  try { if (await syncNow(true)) closeSettings(); }
+  finally { btn.disabled = false; btn.textContent = 'Save and sync'; }
 };
 $('setCreate').onclick = createGist;
 $('setClear').onclick = () => {
