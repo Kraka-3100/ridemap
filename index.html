@@ -51,14 +51,17 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* Right FABs */
-.fabs{position:fixed;z-index:1100;right:max(10px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px}
+.fabs{position:fixed;z-index:1100;right:max(10px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 70px);display:flex;flex-direction:column;gap:8px}
 .fabs button{width:44px;height:44px;border-radius:10px;border:0;background:var(--panel);box-shadow:var(--shadow);display:grid;place-items:center}
 .fabs button:disabled{opacity:.4;cursor:default}
 .fabs svg{width:22px;height:22px;stroke:var(--fg);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
+/* Bottom stack: messages, drawing bars and the stats sheet push each other up instead of overlapping */
+.stack{position:fixed;z-index:1150;left:max(10px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 26px);
+  width:min(400px,calc(100% - 20px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.stack>*{pointer-events:auto}
 /* Bottom sheet */
-.sheet{position:fixed;z-index:1100;left:max(10px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 26px);
-  width:min(380px,calc(100% - 20px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)));background:var(--panel);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.sheet{background:var(--panel);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .sheet-head{width:100%;display:flex;align-items:baseline;gap:10px;border:0;background:transparent;padding:12px 14px;text-align:left}
 .total{font:700 22px/1 var(--f-ui)}
 .total b{font-family:var(--f-num);font-weight:500;font-variant-numeric:tabular-nums}
@@ -68,7 +71,7 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 .sync-dot.ok{background:var(--ok)}.sync-dot.busy{background:var(--warn)}.sync-dot.err{background:var(--danger)}
 .chev{width:16px;height:16px;stroke:var(--muted);fill:none;stroke-width:2.5;align-self:center;transition:transform .15s}
 .sheet-head[aria-expanded="true"] .chev{transform:rotate(180deg)}
-.sheet-body{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px;max-height:55vh;overflow:auto}
+.sheet-body{padding:0 14px 14px;display:flex;flex-direction:column;gap:12px;max-height:45vh;overflow:auto}
 .stats{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px}
 .stats li{display:contents}
 .stats .lbl{display:flex;align-items:center;gap:8px;min-width:0}
@@ -79,16 +82,30 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 .btn.primary,.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 .btn.danger{color:var(--danger)}
 .hint{margin:0;font-size:13px;color:var(--muted)}
+.sec{margin:0;font:600 13px/1.2 var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.legend{display:flex;align-items:center;gap:8px;font-size:13px}
+.key{width:26px;height:0;border-top:5px solid #e8590c;border-radius:2px;margin-left:6px}
+.key.planned{border-top:5px dashed #1c7ed6}
+.plansel{border:0;background:var(--panel);color:var(--fg);border-radius:8px;padding:8px 10px;box-shadow:var(--shadow);max-width:46vw;font:600 14px var(--f-ui)}
+.plans{display:flex;flex-direction:column;gap:10px}
+.plan{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.plan.active{border-color:#1c7ed6;box-shadow:inset 3px 0 0 #1c7ed6}
+.plan-top{display:flex;align-items:center;gap:8px;min-width:0}
+.plan-name{flex:1;min-width:0;border:0;background:none;padding:0;text-align:left;font:600 15px var(--f-ui);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{height:4px;border-radius:2px;background:var(--panel-2);overflow:hidden}
+.bar span{display:block;height:100%;background:#e8590c}
+.plan-acts{display:flex;flex-wrap:wrap;gap:6px}
+.mini{border:1px solid var(--line);background:var(--panel-2);border-radius:6px;padding:3px 8px;font:600 12px var(--f-ui);letter-spacing:.03em}
+.mini.danger{color:var(--danger)}
 
 /* Freehand bar */
-.drawbar{position:fixed;z-index:1150;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);
-  width:min(420px,calc(100% - 20px));background:var(--panel);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.drawbar{background:var(--panel);border-radius:12px;box-shadow:var(--shadow);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .drawinfo{font-size:14px}.drawinfo b{font-family:var(--f-num);font-weight:500}
 .drawbar input{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:7px 10px}
 .row{display:flex;gap:8px;flex-wrap:wrap}.row .btn{flex:1;justify-content:center}
 
 /* Toasts */
-.toasts{position:fixed;z-index:1300;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;width:min(460px,calc(100% - 20px));pointer-events:none}
+.stack>.toasts{display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .toast{pointer-events:auto;background:var(--fg);color:var(--panel);padding:9px 12px;border-radius:8px;box-shadow:var(--shadow);font-size:14px;display:flex;gap:10px;align-items:center}
 .toast.err{background:var(--danger);color:#fff}.toast.warn{background:var(--warn);color:#1b1f23}
 .toast button{border:0;background:transparent;font-weight:600;text-decoration:underline;color:inherit;padding:0}
@@ -107,7 +124,9 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 .leaflet-popup-content{font-family:var(--f-body);margin:10px 12px}
 .pp h3{margin:0 0 4px;font:700 16px/1.2 var(--f-ui)}
 .pp .meta{font-size:12px;color:#5c6670;margin-bottom:8px}
+.pp-row{display:flex;gap:6px;flex-wrap:wrap}
 .pp button{border:1px solid #c92a2a;color:#c92a2a;background:#fff;border-radius:6px;padding:4px 10px;font:600 13px var(--f-ui)}
+.pp button.ok{border-color:#e8590c;color:#fff;background:#e8590c}
 @media (prefers-reduced-motion:reduce){.spinner{animation-duration:2s}.chev{transition:none}}
 @media (max-width:520px){.brand{display:none}}
 </style>
@@ -122,6 +141,11 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
     <button id="modeRoute" role="radio" aria-checked="false">Route</button>
     <button id="modeFree" role="radio" aria-checked="false">Freehand</button>
   </div>
+  <div class="seg" role="radiogroup" aria-label="Mark roads as">
+    <button id="stRidden" class="on" role="radio" aria-checked="true">Ridden</button>
+    <button id="stPlanned" role="radio" aria-checked="false">Planned</button>
+  </div>
+  <select id="planSel" class="plansel" aria-label="Plan that new roads go into" hidden></select>
   <form id="searchForm" class="search" role="search"><input id="searchInput" type="search" placeholder="Search place (MY / TH)" autocomplete="off" enterkeyhint="search"></form>
   <span id="spinner" class="spinner" hidden></span>
 </header>
@@ -131,6 +155,8 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
   <button id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
 </div>
 
+<div class="stack">
+<div id="toasts" class="toasts" aria-live="polite"></div>
 <div id="drawbar" class="drawbar" hidden>
   <div class="drawinfo"><b id="drawLen">0.00 km</b> · <span id="drawPts">0 points</span> · tap the map to add points</div>
   <input id="drawName" type="text" placeholder="Name (optional), e.g. Paddy track Pasir Mas">
@@ -158,18 +184,21 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
     <svg class="chev" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg>
   </button>
   <div class="sheet-body" id="sheetBody" hidden>
+    <div class="legend"><span class="key ridden"></span>Ridden<span class="key planned"></span>Planned</div>
+    <h3 class="sec">Ridden by road type</h3>
     <ul id="statList" class="stats"></ul>
+    <h3 class="sec">Plans</h3>
+    <div id="planList" class="plans"></div>
     <div class="actions">
       <label class="btn">Import GPX<input id="fileGpx" type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" multiple hidden></label>
       <label class="btn">Import GeoJSON<input id="fileGeo" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden></label>
       <button id="btnExport" class="btn">Export GeoJSON</button>
       <button id="btnSettings" class="btn">Sync settings</button>
     </div>
-    <p class="hint">Road mode: tap a road to highlight it between the nearest junctions. Tap a highlight to see or remove it. Route mode: tap your start, then each turn-off point; the roads between are found for you. Use Freehand for tracks that aren't on the map.</p>
+    <p class="hint">Ridden / Planned in the top bar decides where new roads go. Road mode: tap a road to highlight it between the nearest junctions. Tap a highlight to see or remove it. Route mode: tap your start, then each turn-off point; the roads between are found for you. Use Freehand for tracks that aren't on the map.</p>
   </div>
 </section>
-
-<div id="toasts" class="toasts" aria-live="polite"></div>
+</div>
 
 <div id="dlg" class="dlg-back" hidden>
   <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
@@ -251,7 +280,7 @@ function toast(msg, kind = '', ms = 3500, action) {
   const span = document.createElement('span'); span.textContent = msg; el.appendChild(span);
   if (action) { const b = document.createElement('button'); b.textContent = action.label; b.onclick = () => { action.fn(); el.remove(); }; el.appendChild(b); }
   $('toasts').appendChild(el);
-  while ($('toasts').children.length > 3) $('toasts').firstChild.remove();
+  while ($('toasts').children.length > 2) $('toasts').firstChild.remove();
   setTimeout(() => el.remove(), ms);
 }
 window.addEventListener('error', e => toast('Unexpected error: ' + (e.message || e), 'err', 8000));
@@ -259,9 +288,15 @@ window.addEventListener('unhandledrejection', e => toast('Unexpected error: ' + 
 
 /* ---------- data model ----------
    store = FeatureCollection of LineStrings
-   properties: {id, kind:'osm'|'free'|'gpx', cls, hw, name, way, added(ms), m(metres)}
-   meta.deleted = {id: deletedAt(ms)} tombstones so deletions survive merges */
-function emptyStore() { return {type:'FeatureCollection', meta:{version:1, updated:0, deleted:{}}, features:[]}; }
+   properties: {id, kind:'osm'|'free'|'gpx', cls, hw, name, way, added(ms), m(metres),
+                status:'ridden'|'planned', plan (plan id, planned only), base (road identity)}
+   A planned copy of a road has id "p.<plan>.<base>"; the ridden copy has id = base.
+   A planned road counts as done when a ridden road with the same base exists.
+   meta.deleted = {id: deletedAt(ms)} tombstones so deletions survive merges
+   meta.plans   = {planId: {name, created, updated, deleted}} */
+const RIDDEN_COLOR = '#e8590c', PLANNED_COLOR = '#1c7ed6';
+function emptyStore() { return {type:'FeatureCollection', meta:{version:2, updated:0, deleted:{}, plans:{}}, features:[]}; }
+const plannedId = (plan, base) => 'p.' + plan + '.' + base;
 
 function normalizeFeature(f, fallbackCls = 'free', fallbackKind = 'free') {
   if (!f || f.type !== 'Feature' || !f.geometry || f.geometry.type !== 'LineString' || !Array.isArray(f.geometry.coordinates)) return null;
@@ -269,19 +304,38 @@ function normalizeFeature(f, fallbackCls = 'free', fallbackKind = 'free') {
   if (coords.length < 2) return null;
   const p = f.properties || {};
   const cls = CLASSES[p.cls] ? p.cls : fallbackCls;
-  const id = (typeof p.id === 'string' && p.id) ? p.id.slice(0, 100) : 'i' + hash(JSON.stringify(coords));
+  const id = (typeof p.id === 'string' && p.id) ? p.id.slice(0, 160) : 'i' + hash(JSON.stringify(coords));
+  const planned = p.status === 'planned' && typeof p.plan === 'string' && p.plan !== '';
   return {type:'Feature', geometry:{type:'LineString', coordinates:coords},
     properties:{id, kind: ['osm','free','gpx'].includes(p.kind) ? p.kind : fallbackKind, cls, hw: String(p.hw || ''),
       name: String(p.name || '').slice(0, 120), way: Number.isFinite(+p.way) && p.way !== null ? +p.way : null,
-      added: Number.isFinite(+p.added) && +p.added > 0 ? +p.added : Date.now(), m: lineM(coords)}};
+      added: Number.isFinite(+p.added) && +p.added > 0 ? +p.added : Date.now(), m: lineM(coords),
+      status: planned ? 'planned' : 'ridden', plan: planned ? p.plan.slice(0, 40) : '',
+      base: (typeof p.base === 'string' && p.base) ? p.base.slice(0, 120) : id}};
+}
+function asPlanned(f, plan) {
+  const base = f.properties.status === 'planned' ? f.properties.base : f.properties.id;
+  return {...f, properties:{...f.properties, status:'planned', plan, base, id:plannedId(plan, base), added:Date.now()}};
+}
+function asRidden(f) {
+  return {...f, properties:{...f.properties, status:'ridden', plan:'', id:f.properties.base, added:Date.now()}};
 }
 
+function normalizePlans(src) {
+  const out = {};
+  if (src && typeof src === 'object') for (const [id, p] of Object.entries(src)) {
+    if (!p || typeof p.name !== 'string' || !/^[\w.-]{1,40}$/.test(id)) continue;
+    out[id] = {name:p.name.slice(0, 60), created:+p.created || 0, updated:+p.updated || 0, deleted:+p.deleted || 0};
+  }
+  return out;
+}
 function normalizeStore(s) {
   if (!s || typeof s !== 'object' || !Array.isArray(s.features)) return null;
   const out = emptyStore();
   out.meta.updated = +s.meta?.updated || 0;
   const del = s.meta?.deleted;
   if (del && typeof del === 'object') for (const [k, v] of Object.entries(del)) if (Number.isFinite(v)) out.meta.deleted[k] = v;
+  out.meta.plans = normalizePlans(s.meta?.plans);
   const seen = new Set();
   for (const f of s.features) {
     const nf = normalizeFeature(f);
@@ -290,11 +344,15 @@ function normalizeStore(s) {
   return out;
 }
 
-// union of features + tombstones; a feature survives unless deleted after it was added
+// union of features + tombstones; a feature survives unless deleted after it was added; plans: newest edit wins
 function mergeStores(a, b) {
   const out = emptyStore();
   out.meta.updated = Math.max(a.meta.updated, b.meta.updated);
   for (const s of [a, b]) for (const [k, v] of Object.entries(s.meta.deleted)) out.meta.deleted[k] = Math.max(out.meta.deleted[k] || 0, v);
+  for (const s of [a, b]) for (const [k, p] of Object.entries(s.meta.plans || {})) {
+    const cur = out.meta.plans[k];
+    if (!cur || p.updated > cur.updated) out.meta.plans[k] = {...p};
+  }
   const byId = new Map();
   for (const s of [a, b]) for (const f of s.features) {
     const cur = byId.get(f.properties.id);
@@ -310,25 +368,36 @@ function mergeStores(a, b) {
 function pruneTombstones(s) {
   const cutoff = Date.now() - TOMBSTONE_TTL;
   for (const [k, v] of Object.entries(s.meta.deleted)) if (v < cutoff) delete s.meta.deleted[k];
+  for (const [k, p] of Object.entries(s.meta.plans)) if (p.deleted && p.deleted < cutoff) delete s.meta.plans[k];
 }
 
 let store = normalizeStore(lsGet(LS_DATA, null)) || emptyStore();
-let settings = Object.assign({token:'', gistId:'', autosync:true, lastSync:0}, lsGet(LS_SET, {}));
+let settings = Object.assign({token:'', gistId:'', autosync:true, lastSync:0, status:'ridden', activePlan:'', hiddenPlans:[]}, lsGet(LS_SET, {}));
+if (!Array.isArray(settings.hiddenPlans)) settings.hiddenPlans = [];
 const undoStack = [];
+const livePlans = () => Object.entries(store.meta.plans).filter(([, p]) => !p.deleted).sort((a, b) => b[1].created - a[1].created);
+const planName = id => store.meta.plans[id]?.name || 'plan';
+const riddenBases = () => new Set(store.features.filter(f => f.properties.status === 'ridden').map(f => f.properties.base));
+const statusColor = () => settings.status === 'planned' ? PLANNED_COLOR : RIDDEN_COLOR;
 
 /* ---------- map ---------- */
 const view = lsGet(LS_VIEW, {c:[4.6, 101.6], z:7, base:'Street (OSM)'});
-const renderer = L.canvas({tolerance: 10});
-const map = L.map('map', {renderer, zoomControl:false, worldCopyJump:true}).setView(view.c, view.z);
+const map = L.map('map', {zoomControl:false, worldCopyJump:true}).setView(view.c, view.z);
+// separate panes/canvases so ridden roads always draw on top of planned ones
+map.createPane('planned').style.zIndex = 410;
+map.createPane('ridden').style.zIndex = 420;
+const plannedRenderer = L.canvas({tolerance:10, pane:'planned'});
+const riddenRenderer = L.canvas({tolerance:10, pane:'ridden'});
 const bases = {
   'Street (OSM)': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}),
   'Satellite (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18, attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics'}),
   'Topo (OpenTopoMap)': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {maxZoom:17, subdomains:'abc', attribution:'&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap (CC-BY-SA)'})
 };
 const labelsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18, attribution:'Labels &copy; Esri'});
-const hl = L.layerGroup().addTo(map);
+const riddenGroup = L.layerGroup().addTo(map);
+const plannedGroup = L.layerGroup().addTo(map);
 (bases[view.base] || bases['Street (OSM)']).addTo(map);
-L.control.layers(bases, {'My roads': hl, 'Place labels (for satellite)': labelsOverlay}, {position:'topright'}).addTo(map);
+L.control.layers(bases, {'Ridden roads': riddenGroup, 'Planned routes': plannedGroup, 'Place labels (for satellite)': labelsOverlay}, {position:'topright'}).addTo(map);
 L.control.zoom({position:'bottomright'}).addTo(map);
 L.control.scale({position:'bottomright', imperial:false}).addTo(map);
 
@@ -345,42 +414,64 @@ function drawFeature(f) {
   const p = f.properties;
   if (layers.has(p.id)) return;
   const ll = f.geometry.coordinates.map(c => [c[1], c[0]]);
-  const color = CLASSES[p.cls]?.color || '#868e96';
-  const casing = L.polyline(ll, {color:'#000', weight:8, opacity:.35, interactive:false, lineCap:'round', lineJoin:'round'});
-  const line = L.polyline(ll, {color, weight:5, opacity:.95, lineCap:'round', lineJoin:'round', dashArray: p.kind === 'free' ? '9 7' : null});
+  const planned = p.status === 'planned', renderer = planned ? plannedRenderer : riddenRenderer;
+  const casing = L.polyline(ll, {renderer, color:'#000', weight:8, opacity:planned ? .2 : .35, interactive:false, lineCap:'round', lineJoin:'round'});
+  const line = L.polyline(ll, {renderer, color:planned ? PLANNED_COLOR : RIDDEN_COLOR, weight:5, opacity:.95, lineCap:'round', lineJoin:'round', dashArray:planned ? '10 8' : null});
   line.on('click', e => { suppressMapClickUntil = Date.now() + 400; L.DomEvent.stop(e); openFeaturePopup(p.id, e.latlng); });
-  const g = L.layerGroup([casing, line]).addTo(hl);
+  const g = L.layerGroup([casing, line]).addTo(planned ? plannedGroup : riddenGroup);
   layers.set(p.id, g);
 }
-function undrawFeature(id) { const g = layers.get(id); if (g) { hl.removeLayer(g); layers.delete(id); } }
+function undrawFeature(id) { const g = layers.get(id); if (g) { g.remove(); layers.delete(id); } }
+// planned roads show only while their plan exists, is not hidden, and the road hasn't been ridden
+function isVisible(f, rb) {
+  const p = f.properties;
+  if (p.status === 'ridden') return true;
+  const pl = store.meta.plans[p.plan];
+  return !!pl && !pl.deleted && !settings.hiddenPlans.includes(p.plan) && !rb.has(p.base);
+}
 function syncLayersToStore() {
-  const ids = new Set(store.features.map(f => f.properties.id));
-  for (const id of [...layers.keys()]) if (!ids.has(id)) undrawFeature(id);
-  for (const f of store.features) drawFeature(f);
+  const rb = riddenBases(), want = new Set();
+  for (const f of store.features) if (isVisible(f, rb)) want.add(f.properties.id);
+  for (const id of [...layers.keys()]) if (!want.has(id)) undrawFeature(id);
+  for (const f of store.features) if (want.has(f.properties.id)) drawFeature(f);
 }
 
 function openFeaturePopup(id, latlng) {
   const f = store.features.find(x => x.properties.id === id);
   if (!f) return;
-  const p = f.properties;
+  const p = f.properties, planned = p.status === 'planned';
   const el = document.createElement('div'); el.className = 'pp';
   const h = document.createElement('h3'); h.textContent = p.name || CLASSES[p.cls]?.label || 'Unnamed';
   const meta = document.createElement('div'); meta.className = 'meta';
-  meta.textContent = `${CLASSES[p.cls]?.label || p.cls}${p.hw ? ' (' + p.hw + ')' : ''} · ${fmtKm(p.m)} km · added ${new Date(p.added).toLocaleDateString()}`;
-  const b = document.createElement('button'); b.textContent = 'Remove';
+  meta.textContent = `${planned ? 'Planned · ' + planName(p.plan) : 'Ridden'} · ${CLASSES[p.cls]?.label || p.cls}${p.hw ? ' (' + p.hw + ')' : ''} · ${fmtKm(p.m)} km · added ${new Date(p.added).toLocaleDateString()}`;
+  el.append(h, meta);
+  const row = document.createElement('div'); row.className = 'pp-row';
+  if (planned) {
+    const done = document.createElement('button'); done.className = 'ok'; done.textContent = 'Mark ridden';
+    done.onclick = () => { map.closePopup(); addFeatures([asRidden(f)]); toast('Marked as ridden', '', 4000, {label:'Undo', fn:undo}); };
+    row.appendChild(done);
+  }
+  const b = document.createElement('button'); b.textContent = planned ? 'Remove from plan' : 'Remove';
   b.onclick = () => { map.closePopup(); removeFeatures([id]); toast('Removed ' + (p.name || 'segment'), '', 5000, {label:'Undo', fn:undo}); };
-  el.append(h, meta, b);
+  row.appendChild(b);
+  el.appendChild(row);
   L.popup({autoPanPadding:[40, 80]}).setLatLng(latlng).setContent(el).openOn(map);
 }
 
 /* ---------- mutations ---------- */
+// new roads go to the current target: ridden, or the active plan
+function stamp(feats) {
+  if (settings.status !== 'planned') return feats;
+  const plan = ensureActivePlan();
+  return plan ? feats.map(f => asPlanned(f, plan)) : [];
+}
 function addFeatures(feats, record = true) {
   const added = [];
   const have = new Set(store.features.map(f => f.properties.id));
   for (const f of feats) {
     if (have.has(f.properties.id)) continue;
     delete store.meta.deleted[f.properties.id];
-    store.features.push(f); have.add(f.properties.id); drawFeature(f); added.push(f);
+    store.features.push(f); have.add(f.properties.id); added.push(f);
   }
   if (added.length) { if (record) pushUndo({op:'add', feats:added}); changed(); }
   return added;
@@ -388,7 +479,7 @@ function addFeatures(feats, record = true) {
 function removeFeatures(ids, record = true) {
   const set = new Set(ids), removed = [], now = Date.now();
   store.features = store.features.filter(f => { if (set.has(f.properties.id)) { removed.push(f); return false; } return true; });
-  for (const f of removed) { store.meta.deleted[f.properties.id] = now; undrawFeature(f.properties.id); }
+  for (const f of removed) store.meta.deleted[f.properties.id] = now;
   if (removed.length) { if (record) pushUndo({op:'remove', feats:removed}); changed(); }
   return removed;
 }
@@ -398,32 +489,196 @@ function undo() {
   $('btnUndo').disabled = !undoStack.length;
   if (!e) return;
   if (e.op === 'add') removeFeatures(e.feats.map(f => f.properties.id), false);
-  else addFeatures(e.feats.map(f => ({...f, properties:{...f.properties, added:Date.now()}})), false);
-  toast(e.op === 'add' ? 'Undid add' : 'Restored ' + e.feats.length + ' item(s)');
+  else {
+    if (e.plan) store.meta.plans[e.plan.id] = {...e.plan.before, deleted:0, updated:Date.now()}; // undo a plan delete
+    if (!addFeatures(e.feats.map(f => ({...f, properties:{...f.properties, added:Date.now()}})), false).length) changed();
+  }
+  toast(e.op === 'add' ? 'Undid add' : e.plan ? 'Restored plan ' + e.plan.before.name : 'Restored ' + e.feats.length + ' item(s)');
 }
+function refreshUI() { syncLayersToStore(); renderStats(); renderPlans(); renderStatusUI(); }
 function changed() {
   store.meta.updated = Date.now();
   lsSet(LS_DATA, store);
-  renderStats();
+  refreshUI();
   scheduleSync();
+}
+
+/* ---------- plans ---------- */
+function createPlan() {
+  const name = (prompt('Name for the new plan (e.g. Gua Musang loop):', '') || '').trim();
+  if (!name) return '';
+  const id = 'pl' + Date.now().toString(36) + hash(name).slice(0, 3);
+  const now = Date.now();
+  store.meta.plans[id] = {name:name.slice(0, 60), created:now, updated:now, deleted:0};
+  settings.activePlan = id; lsSet(LS_SET, settings);
+  changed();
+  toast(`Created plan "${name}". New roads now go into it.`);
+  return id;
+}
+function ensureActivePlan() {
+  const p = store.meta.plans[settings.activePlan];
+  if (p && !p.deleted) return settings.activePlan;
+  const live = livePlans();
+  if (live.length) { settings.activePlan = live[0][0]; lsSet(LS_SET, settings); renderStatusUI(); return settings.activePlan; }
+  return createPlan();
+}
+function setStatus(st) {
+  if (st === 'planned' && !ensureActivePlan()) st = 'ridden'; // prompt cancelled
+  settings.status = st; lsSet(LS_SET, settings);
+  renderStatusUI(); routeRedraw(); updateDraft();
+}
+function renderStatusUI() {
+  const planned = settings.status === 'planned';
+  $('stRidden').classList.toggle('on', !planned); $('stRidden').setAttribute('aria-checked', String(!planned));
+  $('stPlanned').classList.toggle('on', planned); $('stPlanned').setAttribute('aria-checked', String(planned));
+  const sel = $('planSel');
+  sel.hidden = !planned;
+  sel.textContent = '';
+  for (const [id, p] of livePlans()) { const o = document.createElement('option'); o.value = id; o.textContent = p.name; sel.appendChild(o); }
+  const n = document.createElement('option'); n.value = '__new'; n.textContent = '+ New plan…'; sel.appendChild(n);
+  if (store.meta.plans[settings.activePlan] && !store.meta.plans[settings.activePlan].deleted) sel.value = settings.activePlan;
+  else if (planned) { const live = livePlans(); if (live.length) { settings.activePlan = live[0][0]; sel.value = settings.activePlan; } else { settings.status = 'ridden'; sel.hidden = true; $('stRidden').classList.add('on'); $('stPlanned').classList.remove('on'); } }
+}
+$('stRidden').onclick = () => setStatus('ridden');
+$('stPlanned').onclick = () => setStatus('planned');
+$('planSel').onchange = e => {
+  if (e.target.value === '__new') { if (!createPlan()) renderStatusUI(); }
+  else { settings.activePlan = e.target.value; lsSet(LS_SET, settings); }
+};
+
+function planFeatures(id) { return store.features.filter(f => f.properties.status === 'planned' && f.properties.plan === id); }
+function planProgress(id, rb) {
+  let total = 0, done = 0;
+  for (const f of planFeatures(id)) { total += f.properties.m; if (rb.has(f.properties.base)) done += f.properties.m; }
+  return {total, done};
+}
+function markPlanRidden(id) {
+  const rb = riddenBases();
+  const todo = planFeatures(id).filter(f => !rb.has(f.properties.base)).map(asRidden);
+  if (!todo.length) { toast('Everything in this plan is already ridden.'); return; }
+  const added = addFeatures(todo);
+  toast(`Marked ${added.length} segment(s) of "${planName(id)}" as ridden`, '', 5000, {label:'Undo', fn:undo});
+}
+function renamePlan(id) {
+  const pl = store.meta.plans[id]; if (!pl) return;
+  const name = (prompt('Rename plan:', pl.name) || '').trim();
+  if (!name || name === pl.name) return;
+  pl.name = name.slice(0, 60); pl.updated = Date.now();
+  changed();
+}
+function deletePlan(id) {
+  const pl = store.meta.plans[id]; if (!pl) return;
+  const before = {...pl};
+  pl.deleted = Date.now(); pl.updated = pl.deleted;
+  if (settings.activePlan === id) { settings.activePlan = ''; lsSet(LS_SET, settings); }
+  const removed = removeFeatures(planFeatures(id).map(f => f.properties.id), false);
+  pushUndo({op:'remove', feats:removed, plan:{id, before}});
+  if (!removed.length) changed();
+  toast(`Deleted plan "${before.name}"`, '', 6000, {label:'Undo', fn:undo});
+}
+function togglePlanVisible(id) {
+  const i = settings.hiddenPlans.indexOf(id);
+  if (i >= 0) settings.hiddenPlans.splice(i, 1); else settings.hiddenPlans.push(id);
+  lsSet(LS_SET, settings); syncLayersToStore(); renderPlans();
+}
+function fitPlan(id) {
+  const pts = planFeatures(id).flatMap(f => f.geometry.coordinates.map(c => [c[1], c[0]]));
+  if (pts.length) map.fitBounds(L.latLngBounds(pts), {padding:[40, 40]});
+}
+
+// join plan segments end-to-end into as few continuous tracks as possible (for navigation apps)
+function chainSegments(lines) {
+  const key = c => c[0] + ',' + c[1];
+  const pool = lines.map(l => l.slice()), chains = [];
+  while (pool.length) {
+    let chain = pool.shift(), grew = true;
+    while (grew) {
+      grew = false;
+      for (let i = 0; i < pool.length; i++) {
+        const s = pool[i], cs = key(chain[0]), ce = key(chain[chain.length - 1]), ss = key(s[0]), se = key(s[s.length - 1]);
+        if (ce === ss) chain = chain.concat(s.slice(1));
+        else if (ce === se) chain = chain.concat(s.slice().reverse().slice(1));
+        else if (cs === se) chain = s.concat(chain.slice(1));
+        else if (cs === ss) chain = s.slice().reverse().concat(chain.slice(1));
+        else continue;
+        pool.splice(i, 1); grew = true; break;
+      }
+    }
+    chains.push(chain);
+  }
+  return chains;
+}
+function downloadFile(content, type, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function exportPlanGPX(id) {
+  const feats = planFeatures(id).sort((a, b) => a.properties.added - b.properties.added);
+  if (!feats.length) { toast('This plan has no roads yet.', 'warn'); return; }
+  const esc = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;'}[c]));
+  const name = planName(id);
+  const chains = chainSegments(feats.map(f => f.geometry.coordinates));
+  const gpx = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Ride Map" xmlns="http://www.topografix.com/GPX/1/1">\n'
+    + `<metadata><name>${esc(name)}</name></metadata>\n<trk><name>${esc(name)}</name>\n`
+    + chains.map(c => '<trkseg>' + c.map(p => `<trkpt lat="${p[1]}" lon="${p[0]}"/>`).join('') + '</trkseg>').join('\n')
+    + '\n</trk>\n</gpx>\n';
+  downloadFile(gpx, 'application/gpx+xml', `${name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'plan'}.gpx`);
+  toast(`Exported "${name}" as GPX (${chains.length} track piece${chains.length === 1 ? '' : 's'})`);
+}
+
+function renderPlans() {
+  const box = $('planList'); box.textContent = '';
+  const live = livePlans(), rb = riddenBases();
+  if (!live.length) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'No plans yet. Switch the top bar to Planned to start one.'; box.appendChild(p); return; }
+  for (const [id, pl] of live) {
+    const {total, done} = planProgress(id, rb);
+    const row = document.createElement('div'); row.className = 'plan' + (id === settings.activePlan && settings.status === 'planned' ? ' active' : '');
+    const top = document.createElement('div'); top.className = 'plan-top';
+    const vis = document.createElement('input'); vis.type = 'checkbox'; vis.id = 'vis-' + id; vis.checked = !settings.hiddenPlans.includes(id);
+    vis.title = 'Show on map'; vis.onchange = () => togglePlanVisible(id);
+    const nm = document.createElement('button'); nm.className = 'plan-name'; nm.textContent = pl.name; nm.title = 'Zoom to plan'; nm.onclick = () => fitPlan(id);
+    const km = document.createElement('span'); km.className = 'val'; km.textContent = `${fmtKm(done)} / ${fmtKm(total)} km`;
+    top.append(vis, nm, km);
+    const bar = document.createElement('div'); bar.className = 'bar';
+    const fill = document.createElement('span'); fill.style.width = (total ? Math.round(done / total * 100) : 0) + '%'; bar.appendChild(fill);
+    const acts = document.createElement('div'); acts.className = 'plan-acts';
+    const mk = (label, fn, cls = '') => { const b = document.createElement('button'); b.className = 'mini ' + cls; b.textContent = label; b.onclick = fn; acts.appendChild(b); return b; };
+    mk('Add to this', () => { settings.activePlan = id; setStatus('planned'); });
+    mk('GPX', () => exportPlanGPX(id));
+    mk('All ridden', () => markPlanRidden(id));
+    mk('Rename', () => renamePlan(id));
+    const del = mk('Delete', () => {
+      if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Tap again'; setTimeout(() => { del.dataset.armed = ''; del.textContent = 'Delete'; }, 4000); return; }
+      deletePlan(id);
+    }, 'danger');
+    row.append(top, bar, acts);
+    box.appendChild(row);
+  }
 }
 
 /* ---------- stats sheet ---------- */
 function renderStats() {
-  const per = {}; let total = 0;
-  for (const f of store.features) { per[f.properties.cls] = (per[f.properties.cls] || 0) + f.properties.m; total += f.properties.m; }
+  const per = {}; let total = 0, count = 0, plannedLeft = 0;
+  const rb = riddenBases();
+  for (const f of store.features) {
+    const p = f.properties;
+    if (p.status === 'ridden') { per[p.cls] = (per[p.cls] || 0) + p.m; total += p.m; count++; }
+    else if (store.meta.plans[p.plan] && !store.meta.plans[p.plan].deleted && !rb.has(p.base)) plannedLeft += p.m;
+  }
   $('totalKm').textContent = fmtKm(total);
-  $('totalCount').textContent = store.features.length + (store.features.length === 1 ? ' segment' : ' segments');
+  $('totalCount').textContent = `${count} segment${count === 1 ? '' : 's'} · ${fmtKm(plannedLeft)} km planned`;
   const ul = $('statList'); ul.textContent = '';
   for (const [k, c] of Object.entries(CLASSES)) {
+    if (!per[k]) continue;
     const li = document.createElement('li');
-    const lbl = document.createElement('span'); lbl.className = 'lbl';
-    const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = c.color;
-    const t = document.createElement('span'); t.textContent = c.label;
-    lbl.append(sw, t);
-    const val = document.createElement('span'); val.className = 'val'; val.textContent = fmtKm(per[k] || 0) + ' km';
+    const lbl = document.createElement('span'); lbl.className = 'lbl'; lbl.textContent = c.label;
+    const val = document.createElement('span'); val.className = 'val'; val.textContent = fmtKm(per[k]) + ' km';
     li.append(lbl, val); ul.appendChild(li);
   }
+  if (!ul.children.length) { const li = document.createElement('li'); li.innerHTML = '<span class="lbl muted">Nothing ridden yet</span><span></span>'; ul.appendChild(li); }
 }
 function setSheet(open) { $('sheetToggle').setAttribute('aria-expanded', String(open)); $('sheetBody').hidden = !open; }
 $('sheetToggle').onclick = () => setSheet($('sheetBody').hidden);
@@ -706,13 +961,19 @@ async function onRoadTap(latlng) {
     if (!s) { toast('No mapped road or path at that spot. Tap closer to the line, or use Freehand.', 'warn'); return; }
     const coords = gToCoords(s.pts);
     if (coords.length < 2) { toast('That road piece is too short to save. Try tapping a different part of it.', 'warn'); return; }
-    const id = segId(coords, s.cls, true);
+    const f0 = normalizeFeature({type:'Feature', geometry:{type:'LineString', coordinates:coords},
+      properties:{id:segId(coords, s.cls, true), kind:'osm', cls:s.cls, hw:s.raw, name:nearestName(tiles, s.at[0], s.at[1]), added:Date.now()}});
+    if (!f0) { toast('That road piece had no usable shape. Try tapping a different part of it.', 'warn'); return; }
+    const [f] = stamp([f0]);
+    if (!f) return; // plan creation cancelled
+    const id = f.properties.id;
     if (layers.has(id)) { openFeaturePopup(id, latlng); return; }
-    const f = normalizeFeature({type:'Feature', geometry:{type:'LineString', coordinates:coords},
-      properties:{id, kind:'osm', cls:s.cls, hw:s.raw, name:nearestName(tiles, s.at[0], s.at[1]), added:Date.now()}});
-    if (!f) { toast('That road piece had no usable shape. Try tapping a different part of it.', 'warn'); return; }
+    if (store.features.some(x => x.properties.id === id) || (f.properties.status === 'planned' && riddenBases().has(f.properties.base))) {
+      toast(f.properties.status === 'planned' ? 'You have already ridden this road.' : 'Already highlighted (hidden layer?).', 'warn'); return;
+    }
     addFeatures([f]);
-    toast(`Added ${f.properties.name || CLASSES[f.properties.cls].label} · ${fmtKm(f.properties.m)} km`, '', 3000, {label:'Undo', fn:undo});
+    const where = f.properties.status === 'planned' ? ` to plan "${planName(f.properties.plan)}"` : '';
+    toast(`Added ${f.properties.name || CLASSES[f.properties.cls].label}${where} · ${fmtKm(f.properties.m)} km`, '', 3000, {label:'Undo', fn:undo});
   } catch (e) {
     toast('Road lookup failed: ' + e.message + '. Check your connection and tap again.', 'err', 7000);
   } finally {
@@ -842,9 +1103,9 @@ function routeRedraw() {
   let m = 0;
   for (const leg of route.legs) {
     m += leg.m;
-    for (const p of leg.pieces) L.polyline(p.coords.map(c => [c[1], c[0]]), {color:CLASSES[p.cls].color, weight:5, opacity:.9, dashArray:'8 6', interactive:false}).addTo(route.layer);
+    for (const p of leg.pieces) L.polyline(p.coords.map(c => [c[1], c[0]]), {color:statusColor(), weight:5, opacity:.9, dashArray:'4 6', interactive:false}).addTo(route.layer);
   }
-  route.way.forEach((w, i) => { const [lon, lat] = gToLonLat(w.x, w.y); L.circleMarker([lat, lon], {radius: i === 0 ? 7 : 5, color:'#fff', weight:2, fillColor:'#0b7285', fillOpacity:1, interactive:false}).addTo(route.layer); });
+  route.way.forEach((w, i) => { const [lon, lat] = gToLonLat(w.x, w.y); L.circleMarker([lat, lon], {radius: i === 0 ? 7 : 5, color:'#fff', weight:2, fillColor:statusColor(), fillOpacity:1, interactive:false}).addTo(route.layer); });
   $('routeLen').textContent = fmtKm(m) + ' km';
   $('routeInfo').textContent = !route.way.length ? 'tap your start point'
     : `${route.legs.length} leg${route.legs.length === 1 ? '' : 's'} · tap the next point`;
@@ -893,12 +1154,13 @@ async function onRouteTap(latlng) {
 }
 function saveRoute() {
   if (!route.legs.length) { toast('Place at least two points to make a route.', 'warn'); return; }
-  const feats = finalizeRoute(route.legs);
+  const feats = stamp(finalizeRoute(route.legs));
+  if (!feats.length) return; // plan creation cancelled
   const before = store.features.length;
   const added = addFeatures(feats);
   const m = added.reduce((s, f) => s + f.properties.m, 0);
   const skipped = feats.length - added.length;
-  toast(`Saved route · ${added.length} new segment${added.length === 1 ? '' : 's'} · ${fmtKm(m)} km${skipped ? ` · ${skipped} already highlighted` : ''}`, '', 4500, added.length ? {label:'Undo', fn:undo} : undefined);
+  toast(`Saved route${settings.status === 'planned' ? ' to plan "' + planName(settings.activePlan) + '"' : ''} · ${added.length} new segment${added.length === 1 ? '' : 's'} · ${fmtKm(m)} km${skipped ? ` · ${skipped} already there` : ''}`, '', 4500, added.length ? {label:'Undo', fn:undo} : undefined);
   if (store.features.length >= before) clearRoute();
 }
 $('routeUndo').onclick = () => { if (route.legs.length) route.legs.pop(); route.way.pop(); routeRedraw(); };
@@ -916,6 +1178,8 @@ function setMode(m) {
   for (const [id, k] of [['modeRoad', 'road'], ['modeRoute', 'route'], ['modeFree', 'free']]) { $(id).classList.toggle('on', m === k); $(id).setAttribute('aria-checked', String(m === k)); }
   map.getContainer().classList.toggle('free-mode', m !== 'road');
   $('drawbar').hidden = m !== 'free'; $('routebar').hidden = m !== 'route';
+  document.body.classList.toggle('drawing', m !== 'road'); // lifts messages above the bar
+  if (m !== 'road') setSheet(false);
   if (m === 'road') map.doubleClickZoom.enable(); else map.doubleClickZoom.disable(); // stray double taps shouldn't zoom while placing points
   if (m === 'free') { draft.dots.addTo(map); updateDraft(); } else { clearDraft(); map.removeLayer(draft.dots); }
   if (m === 'route') { route.layer.addTo(map); routeRedraw(); } else { clearRoute(); map.removeLayer(route.layer); }
@@ -925,9 +1189,9 @@ function updateDraft() {
   $('drawLen').textContent = fmtKm(lineM(coords)) + ' km';
   $('drawPts').textContent = draft.pts.length + (draft.pts.length === 1 ? ' point' : ' points');
   if (draft.line) { map.removeLayer(draft.line); draft.line = null; }
-  if (draft.pts.length > 1) draft.line = L.polyline(draft.pts, {color:CLASSES.free.color, weight:4, dashArray:'6 6', interactive:false}).addTo(map);
+  if (draft.pts.length > 1) draft.line = L.polyline(draft.pts, {color:statusColor(), weight:4, dashArray:'4 6', interactive:false}).addTo(map);
   draft.dots.clearLayers();
-  draft.pts.forEach(p => L.circleMarker(p, {radius:4, color:CLASSES.free.color, fillOpacity:1, interactive:false}).addTo(draft.dots));
+  draft.pts.forEach(p => L.circleMarker(p, {radius:4, color:statusColor(), fillOpacity:1, interactive:false}).addTo(draft.dots));
 }
 function clearDraft() { draft.pts = []; $('drawName').value = ''; updateDraft(); }
 function finishDraft() {
@@ -937,7 +1201,9 @@ function finishDraft() {
   const coords = pts.map(p => [r5(p.lng), r5(p.lat)]);
   const f = normalizeFeature({type:'Feature', geometry:{type:'LineString', coordinates:coords},
     properties:{id:'f' + Date.now().toString(36) + hash(JSON.stringify(coords)), kind:'free', cls:'free', name:$('drawName').value.trim(), added:Date.now()}});
-  addFeatures([f]);
+  const [sf] = stamp([f]);
+  if (!sf) return;
+  addFeatures([sf]);
   toast(`Saved freehand line · ${fmtKm(f.properties.m)} km`, '', 3000, {label:'Undo', fn:undo});
   clearDraft();
 }
@@ -985,7 +1251,7 @@ $('fileGpx').onchange = async e => {
   const files = [...e.target.files]; e.target.value = '';
   const all = []; const errs = [];
   for (const file of files) { try { all.push(...parseGPX(await file.text(), file.name)); } catch (err) { errs.push(err.message); } }
-  const added = addFeatures(all);
+  const added = addFeatures(all.length ? stamp(all) : all);
   if (added.length) {
     toast(`Imported ${added.length} track(s) · ${fmtKm(added.reduce((s, f) => s + f.properties.m, 0))} km`, '', 4000, {label:'Undo', fn:undo});
     const b = L.latLngBounds(added.flatMap(f => f.geometry.coordinates.map(c => [c[1], c[0]]))); map.fitBounds(b, {padding:[40, 40]});
@@ -1012,14 +1278,7 @@ $('fileGeo').onchange = async e => {
     toast(`Imported ${added.length} new of ${ok.length} line(s) from ${file.name}`, '', 4000, added.length ? {label:'Undo', fn:undo} : undefined);
   } catch (err) { toast(`${file.name}: ${err.message}`, 'err', 7000); }
 };
-$('btnExport').onclick = () => {
-  const blob = new Blob([JSON.stringify(store)], {type:'application/geo+json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `ridemap-${new Date().toISOString().slice(0, 10)}.geojson`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-};
+$('btnExport').onclick = () => downloadFile(JSON.stringify(store), 'application/geo+json', `ridemap-${new Date().toISOString().slice(0, 10)}.geojson`);
 
 /* ---------- GitHub Gist sync ---------- */
 let syncTimer = null, syncing = false, syncAgain = false;
@@ -1067,7 +1326,7 @@ async function syncNow(manual = false) {
     const remoteJson = remote ? JSON.stringify(remote) : '';
     if (remote) store = mergeStores(store, remote);
     pruneTombstones(store);
-    lsSet(LS_DATA, store); syncLayersToStore(); renderStats();
+    lsSet(LS_DATA, store); refreshUI();
     const content = JSON.stringify(store);
     if (content !== remoteJson) await gh('/gists/' + encodeURIComponent(settings.gistId), {method:'PATCH', body:JSON.stringify({files:{[GIST_FILE]:{content}}})});
     settings.lastSync = Date.now(); lsSet(LS_SET, settings);
@@ -1122,7 +1381,7 @@ $('setCreate').onclick = createGist;
 $('setClear').onclick = () => {
   const b = $('setClear');
   if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to erase this browser’s copy'; return; }
-  store = emptyStore(); lsSet(LS_DATA, store); syncLayersToStore(); renderStats(); undoStack.length = 0; $('btnUndo').disabled = true;
+  store = emptyStore(); lsSet(LS_DATA, store); refreshUI(); undoStack.length = 0; $('btnUndo').disabled = true;
   b.dataset.armed = ''; b.textContent = 'Clear local data';
   setSyncState('', 'Local data cleared. The Gist is untouched; Save and sync to pull it back.');
 };
@@ -1168,9 +1427,8 @@ document.addEventListener('keydown', e => {
 });
 
 /* ---------- boot ---------- */
+refreshUI();
 if (typeof MVT === 'undefined') toast('Map tile decoder failed to load. Road mode will not work; reload the page.', 'err', 10000);
-syncLayersToStore();
-renderStats();
 setSheet(window.innerWidth > 700);
 if (settings.token && settings.gistId) syncNow(false); else setSyncState('', 'Sync not set up. Open Sync settings to connect a Gist.');
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && settings.token && settings.gistId && Date.now() - settings.lastSync > 60000) syncNow(false); });
