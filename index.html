@@ -201,9 +201,13 @@ const LS_DATA = 'ridemap.v1.data', LS_SET = 'ridemap.v1.settings', LS_VIEW = 'ri
 const GIST_FILE = 'ridemap.geojson';
 const OVERPASS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter'
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter'
 ];
+const OP_TIMEOUT = 25000;   // per-server request limit
+const OP_STAGGER = 4000;    // start the next server if the current one hasn't answered by then
+const JUNCTION_RANGE = 2500; // metres around the tap searched for junctions (keeps queries light)
 const MIN_ROAD_ZOOM = 14;          // below this, tap radius gets too large for a sensible pick
 const TAP_PX = 22;                 // tap tolerance in screen pixels
 const TOMBSTONE_TTL = 365 * 864e5; // forget deletions after a year
@@ -426,21 +430,43 @@ $('sheetToggle').onclick = () => setSheet($('sheetBody').hidden);
 let busy = false;
 function setBusy(b) { busy = b; $('spinner').hidden = !b; }
 
-async function overpass(query) {
-  let lastErr = 'no server answered';
-  for (const url of OVERPASS) {
-    const host = new URL(url).host;
-    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
-    try {
-      const res = await fetch(url, {method:'POST', body:'data=' + encodeURIComponent(query),
-        headers:{'Content-Type':'application/x-www-form-urlencoded'}, signal:ctl.signal});
-      if (res.ok) return await res.json();
-      lastErr = `${host} returned HTTP ${res.status}` + (res.status === 429 ? ' (rate limited)' : res.status === 504 ? ' (server overloaded)' : '');
-    } catch (e) {
-      lastErr = `${host}: ` + (e.name === 'AbortError' ? 'timed out after 20 s' : (e.message || 'network error'));
-    } finally { clearTimeout(t); }
-  }
-  throw new Error('Road lookup failed on all servers. Last error: ' + lastErr + '. Wait about 30 s and tap again.');
+/* Staggered race: start the preferred server; if it hasn't answered in OP_STAGGER ms (or fails fast),
+   start the next. First good answer wins and the rest are aborted. All failure reasons are reported. */
+let opPreferred = 0;
+function overpass(query) {
+  return new Promise((resolve, reject) => {
+    const order = OVERPASS.map((_, i) => (i + opPreferred) % OVERPASS.length);
+    const ctls = [], errs = [];
+    let next = 0, failed = 0, done = false, staggerTimer = null;
+    const launch = () => {
+      clearTimeout(staggerTimer);
+      if (done || next >= order.length) return;
+      const idx = order[next++], url = OVERPASS[idx], host = new URL(url).host;
+      const ctl = new AbortController(); ctls.push(ctl);
+      const t = setTimeout(() => ctl.abort(), OP_TIMEOUT);
+      staggerTimer = setTimeout(launch, OP_STAGGER);
+      fetch(url, {method:'POST', body:'data=' + encodeURIComponent(query),
+        headers:{'Content-Type':'application/x-www-form-urlencoded'}, signal:ctl.signal})
+        .then(async res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}` + (res.status === 429 ? ' rate limited' : res.status === 504 ? ' overloaded' : ''));
+          const j = await res.json();
+          // Overpass reports query-side failures as HTTP 200 with a "remark"
+          if (j.remark && /error|timed out|out of memory/i.test(j.remark) && !(j.elements || []).length) throw new Error('server error: ' + j.remark.slice(0, 60));
+          if (done) return;
+          done = true; opPreferred = idx; clearTimeout(staggerTimer);
+          ctls.forEach(c => c !== ctl && c.abort());
+          resolve(j);
+        })
+        .catch(e => {
+          if (done) return;
+          errs.push(host + ': ' + (e.name === 'AbortError' ? `no answer in ${OP_TIMEOUT / 1000} s` : (e.message === 'Failed to fetch' || e.message === 'Load failed' ? 'blocked or unreachable' : e.message)));
+          if (++failed === order.length) { done = true; clearTimeout(staggerTimer); reject(new Error('Road lookup failed. ' + errs.join(' · ') + '. Wait about 30 s and tap again.')); }
+          else launch(); // fail fast → try the next server right away
+        })
+        .finally(() => clearTimeout(t));
+    };
+    launch();
+  });
 }
 
 function classify(hw) {
@@ -454,13 +480,14 @@ function classify(hw) {
 
 /* Pure: given ways (Map id→{nodes, geometry, tags}), chosen way id and segment index i (between nodes i and i+1),
    return [lo, hi] node indices of the junction-bounded slice. Junction = node shared with another highway way. */
-function junctionSlice(ways, wayId, i) {
+// isBoundary(k) lets the caller stop the slice at node k (used to cap slices at the junction search range)
+function junctionSlice(ways, wayId, i, isBoundary = () => false) {
   const cnt = new Map();
   for (const w of ways.values()) for (const n of new Set(w.nodes || [])) cnt.set(n, (cnt.get(n) || 0) + 1);
   const N = ways.get(wayId).nodes;
   let lo = i, hi = i + 1;
-  while (lo > 0 && (cnt.get(N[lo]) || 0) < 2) lo--;
-  while (hi < N.length - 1 && (cnt.get(N[hi]) || 0) < 2) hi++;
+  while (lo > 0 && (cnt.get(N[lo]) || 0) < 2 && !isBoundary(lo)) lo--;
+  while (hi < N.length - 1 && (cnt.get(N[hi]) || 0) < 2 && !isBoundary(hi)) hi++;
   return [lo, hi];
 }
 
@@ -472,7 +499,9 @@ async function onRoadTap(latlng) {
   try {
     const p0 = map.latLngToContainerPoint(latlng);
     const radius = Math.min(80, Math.max(8, Math.round(map.distance(latlng, map.containerPointToLatLng(p0.add([TAP_PX, 0]))))));
-    const q = `[out:json][timeout:25];way(around:${radius},${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)})["highway"]->.c;.c out body geom;node(w.c)->.n;way(bn.n)["highway"]->.x;.x out skel;`;
+    const lat = latlng.lat.toFixed(6), lon = latlng.lng.toFixed(6);
+    // only nodes within JUNCTION_RANGE are checked for junctions, so long trunk roads stay cheap to query
+    const q = `[out:json][timeout:20];way(around:${radius},${lat},${lon})["highway"]->.c;.c out body geom;node(w.c)(around:${JUNCTION_RANGE},${lat},${lon})->.n;way(bn.n)["highway"]->.x;.x out skel;`;
     const json = await overpass(q);
     const ways = new Map();
     for (const el of json.elements || []) {
@@ -494,7 +523,9 @@ async function onRoadTap(latlng) {
       }
     }
     if (!best || best.d > TAP_PX * 1.6) { toast('No mapped road or path at that spot. Tap closer to the line, or use Freehand.', 'warn'); return; }
-    const [lo, hi] = junctionSlice(ways, best.w.id, best.i);
+    // beyond the searched range junctions are unknown, so cap the slice just inside it
+    const tap = [latlng.lng, latlng.lat], G = best.w.geometry;
+    const [lo, hi] = junctionSlice(ways, best.w.id, best.i, k => hav([G[k].lon, G[k].lat], tap) > JUNCTION_RANGE - 100);
     const N = best.w.nodes, t = best.w.tags;
     const id = `w${best.w.id}:${N[lo]}-${N[hi]}`;
     if (layers.has(id)) { openFeaturePopup(id, latlng); return; }
