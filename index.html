@@ -389,16 +389,27 @@ map.createPane('planned').style.zIndex = 410;
 map.createPane('ridden').style.zIndex = 420;
 const plannedRenderer = L.canvas({tolerance:10, pane:'planned'});
 const riddenRenderer = L.canvas({tolerance:10, pane:'ridden'});
+// Tile layer that also loads a margin of tiles beyond the screen edge, loads while panning,
+// and keeps more off-screen tiles, so scrolling shows ready imagery instead of grey squares.
+const PRELOAD_PX = window.innerWidth > 700 ? 512 : 256; // smaller margin on phones to limit mobile data
+const TILE_OPTS = {updateWhenIdle:false, updateInterval:120, keepBuffer:6};
+const PreloadTileLayer = L.TileLayer.extend({
+  _getTiledPixelBounds(center) {
+    const b = L.TileLayer.prototype._getTiledPixelBounds.call(this, center);
+    return L.bounds(b.min.subtract([PRELOAD_PX, PRELOAD_PX]), b.max.add([PRELOAD_PX, PRELOAD_PX]));
+  }
+});
+const tiles = (url, opts) => new PreloadTileLayer(url, {...TILE_OPTS, ...opts});
 // Hybrid = Esri imagery + Esri road and place-name overlays (labels ranked by importance, like Google's hybrid view)
-const esri = (svc, attribution) => L.tileLayer(`https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`, {maxZoom:19, maxNativeZoom:18, attribution});
+const esri = (svc, attribution) => tiles(`https://server.arcgisonline.com/ArcGIS/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`, {maxZoom:19, maxNativeZoom:18, attribution});
 const bases = {
   'Hybrid (satellite + labels)': L.layerGroup([
     esri('World_Imagery', 'Imagery &copy; Esri, Maxar, Earthstar Geographics'),
     esri('Reference/World_Transportation', 'Roads &copy; Esri'),
     esri('Reference/World_Boundaries_and_Places', 'Labels &copy; Esri')]),
-  'Street (OSM)': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}),
-  'Satellite (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18, attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics'}),
-  'Topo (OpenTopoMap)': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {maxZoom:17, subdomains:'abc', attribution:'&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap (CC-BY-SA)'})
+  'Street (OSM)': tiles('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}),
+  'Satellite (Esri)': tiles('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18, attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics'}),
+  'Topo (OpenTopoMap)': tiles('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {maxZoom:17, subdomains:'abc', attribution:'&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap (CC-BY-SA)'})
 };
 const riddenGroup = L.layerGroup().addTo(map);
 const plannedGroup = L.layerGroup().addTo(map);
