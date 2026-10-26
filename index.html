@@ -147,6 +147,17 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 .svclose{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) * 0 + 10px);left:10px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:18px}
 body.sv-open .stack{display:none}
 @media (max-width:899px){body.sv-open .fabs{top:calc(env(safe-area-inset-top,0px) + 70px)}}
+.gusage{display:flex;flex-direction:column;gap:8px}
+.gu-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;font-size:14px}
+.gu-row .val{font-family:var(--f-num);font-variant-numeric:tabular-nums;color:var(--muted)}
+.gu-bar{grid-column:1/-1}
+.bar span.near{background:var(--warn)}
+.bar span.over{background:var(--danger)}
+.lims{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.lims .fld{min-width:0}
+.lims input{width:100%;min-width:0}
+.lims-h{grid-column:1/-1;font-size:13px;color:var(--muted);font-weight:600}
+.dlg input[type=number]{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:8px 10px;color:var(--fg);font-family:var(--f-num);font-size:14px}
 /* Popup */
 .leaflet-popup-content{font-family:var(--f-body);margin:10px 12px}
 .pp h3{margin:0 0 4px;font:700 16px/1.2 var(--f-ui)}
@@ -234,6 +245,8 @@ body.sv-open .stack{display:none}
     <ul id="statList" class="stats"></ul>
     <h3 class="sec">Plans</h3>
     <div id="planList" class="plans"></div>
+    <h3 class="sec" id="gUsageHead" hidden>Google usage · all devices</h3>
+    <div id="gUsage" class="gusage" hidden></div>
     <div class="actions">
       <label class="btn">Import GPX<input id="fileGpx" type="file" accept=".gpx,application/gpx+xml,application/xml,text/xml" multiple hidden></label>
       <label class="btn">Import GeoJSON<input id="fileGeo" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden></label>
@@ -272,6 +285,12 @@ body.sv-open .stack{display:none}
     <label class="fld">Gist ID (leave empty, then Create new Gist)<input id="setGist" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 3f9a1c…"></label>
     <label class="chk"><input id="setAuto" type="checkbox"> Sync automatically after changes</label>
     <label class="fld">Google Maps API key (optional: Google satellite map + Street View; this device only)<input id="setGKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…"></label>
+    <div class="lims"><span class="lims-h">Google limits (all devices combined; set on each device)</span>
+      <label class="fld">Map images per day<input id="limDayT" type="number" min="0" step="100" inputmode="numeric"></label>
+      <label class="fld">Street View per day<input id="limDayS" type="number" min="0" step="10" inputmode="numeric"></label>
+      <label class="fld">Map images per month<input id="limMonT" type="number" min="0" step="1000" inputmode="numeric"></label>
+      <label class="fld">Street View per month<input id="limMonS" type="number" min="0" step="100" inputmode="numeric"></label>
+    </div>
     <div id="setStatus" class="status">Not synced yet.</div>
     <div class="row">
       <button id="setSave" class="btn primary">Save and sync</button>
@@ -1613,6 +1632,146 @@ $('eraseGo').onclick = eraseApply;
 $('eraseTouch').onchange = eraseRefresh;
 $('erasePins').onchange = eraseRefresh;
 
+/* ---------- Google usage tracker ----------
+   Counts Google map images (every displayed tile, including browser-cache hits, so it errs high) and
+   Street View viewer loads (exact) per device, per Google quota day/month (US Pacific time).
+   Counts from all devices are shared through a small second file in the Gist and merged by taking the
+   highest count per device, so totals are combined and limits apply to everything together. */
+const LS_USAGE = 'ridemap.v1.usage', USAGE_FILE = 'ridemap-usage.json';
+const LIMIT_DEFAULTS = {dayT:3000, dayS:150, monT:95000, monS:4800};
+if (!settings.deviceId) { settings.deviceId = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); lsSet(LS_SET, settings); }
+settings.limits = {...LIMIT_DEFAULTS, ...(settings.limits || {})};
+const pacificParts = new Intl.DateTimeFormat('en-US', {timeZone:'America/Los_Angeles', year:'numeric', month:'2-digit', day:'2-digit'});
+function pacificDay(t = Date.now()) {
+  const p = Object.fromEntries(pacificParts.formatToParts(t).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+const pacificMonth = (t = Date.now()) => pacificDay(t).slice(0, 7);
+function nextReset(perMonth = false) { // first full hour at which the Pacific day (or month) changes
+  const cur = perMonth ? pacificMonth() : pacificDay();
+  let t = Math.ceil(Date.now() / 36e5) * 36e5;
+  for (let i = 0; i < (perMonth ? 32 * 24 : 26); i++, t += 36e5) if ((perMonth ? pacificMonth(t) : pacificDay(t)) !== cur) return t;
+  return Date.now() + 864e5;
+}
+const fmtN = n => Math.round(n).toLocaleString();
+const fmtTime = t => new Date(t).toLocaleString([], {hour:'numeric', minute:'2-digit'});
+
+function normalizeUsage(u) {
+  const out = {days:{}, months:{}};
+  for (const per of ['days', 'months']) {
+    const src = u && typeof u === 'object' ? u[per] : null;
+    if (!src || typeof src !== 'object') continue;
+    for (const [k, devs] of Object.entries(src)) {
+      if (!/^\d{4}-\d{2}(-\d{2})?$/.test(k) || !devs || typeof devs !== 'object') continue;
+      out[per][k] = {};
+      for (const [d, c] of Object.entries(devs)) if (/^[\w-]{1,40}$/.test(d) && c && typeof c === 'object') out[per][k][d] = {t:Math.max(0, +c.t || 0), s:Math.max(0, +c.s || 0)};
+    }
+  }
+  return out;
+}
+function mergeUsage(a, b) { // per-device counters only ever grow, so the higher value is the newer one
+  const out = normalizeUsage(a);
+  for (const per of ['days', 'months']) for (const [k, devs] of Object.entries(b[per] || {})) {
+    const o = out[per][k] || (out[per][k] = {});
+    for (const [d, c] of Object.entries(devs)) { const cur = o[d] || {t:0, s:0}; o[d] = {t:Math.max(cur.t, c.t), s:Math.max(cur.s, c.s)}; }
+  }
+  return out;
+}
+function pruneUsage(u) {
+  const keepD = new Set([0, 1, 2].map(i => pacificDay(Date.now() - i * 864e5)));
+  for (const k of Object.keys(u.days)) if (!keepD.has(k)) delete u.days[k];
+  const keepM = new Set([pacificMonth(), pacificMonth(Date.now() - 32 * 864e5)]);
+  for (const k of Object.keys(u.months)) if (!keepM.has(k)) delete u.months[k];
+}
+let usage = normalizeUsage(lsGet(LS_USAGE, null)); pruneUsage(usage);
+let usageDirty = false, usageSaveTimer = null, usageSyncTimer = null, usageRenderTimer = null;
+
+function usageTotals() {
+  const sum = o => Object.values(o || {}).reduce((a, c) => ({t:a.t + c.t, s:a.s + c.s}), {t:0, s:0});
+  return {day:sum(usage.days[pacificDay()]), mon:sum(usage.months[pacificMonth()])};
+}
+function limitState() {
+  const t = usageTotals(), L = settings.limits;
+  return {t, tiles:t.day.t >= L.dayT ? 'day' : t.mon.t >= L.monT ? 'month' : '', sv:t.day.s >= L.dayS ? 'day' : t.mon.s >= L.monS ? 'month' : ''};
+}
+function bump(kind, n = 1) {
+  const id = settings.deviceId;
+  for (const [per, k] of [['days', pacificDay()], ['months', pacificMonth()]]) {
+    const o = usage[per][k] || (usage[per][k] = {}), c = o[id] || (o[id] = {t:0, s:0});
+    c[kind] += n;
+  }
+  usageDirty = true;
+  clearTimeout(usageSaveTimer); usageSaveTimer = setTimeout(() => lsSet(LS_USAGE, usage), 3000);
+  scheduleUsageRender(); checkLimits(); scheduleUsageSync();
+}
+let limitPending = false;
+function checkLimits() {
+  if (limitPending || !limitState().tiles) return;
+  // switch on the next tick: removing a tile layer from inside its own tileload event breaks Leaflet
+  limitPending = true;
+  setTimeout(() => {
+    limitPending = false;
+    const st = limitState();
+    if (!st.tiles) return;
+    if (g.cover) g.cover.remove();
+    if (!g.base || !map.hasLayer(g.base)) return;
+    const day = st.tiles === 'day';
+    googleFallback({limit:true, perMonth:!day,
+      text:day ? `Daily limit of ${fmtN(settings.limits.dayT)} Google map images reached` : `Monthly limit of ${fmtN(settings.limits.monT)} Google map images reached`});
+  }, 0);
+}
+
+// light sync: only the small usage file (the full sync also carries it); more often when close to a limit
+async function syncUsageOnly() {
+  if (!settings.token || !settings.gistId || syncing) return;
+  try {
+    const gist = await gh('/gists/' + encodeURIComponent(settings.gistId));
+    const f = gist.files?.[USAGE_FILE];
+    let remote = null;
+    if (f) { try { remote = normalizeUsage(JSON.parse(f.content)); } catch (_) { remote = null; } }
+    const remoteJson = remote ? JSON.stringify(remote) : '';
+    if (remote) usage = mergeUsage(usage, remote);
+    pruneUsage(usage); lsSet(LS_USAGE, usage);
+    const content = JSON.stringify(usage);
+    if (content !== remoteJson) await gh('/gists/' + encodeURIComponent(settings.gistId), {method:'PATCH', body:JSON.stringify({files:{[USAGE_FILE]:{content}}})});
+    usageDirty = false; renderUsage(); checkLimits();
+  } catch (e) { /* the next full sync or usage sync retries; counting continues locally */ }
+}
+function scheduleUsageSync() {
+  if (!settings.token || !settings.gistId || usageSyncTimer) return;
+  const t = usageTotals().day, L = settings.limits;
+  const near = t.t >= L.dayT * .8 || t.s >= L.dayS * .8;
+  usageSyncTimer = setTimeout(() => { usageSyncTimer = null; if (usageDirty) syncUsageOnly(); }, near ? 3 * 60e3 : 10 * 60e3);
+}
+
+function scheduleUsageRender() { if (!usageRenderTimer) usageRenderTimer = setTimeout(() => { usageRenderTimer = null; renderUsage(); }, 1000); }
+function renderUsage() {
+  const on = !!googleKey();
+  $('gUsageHead').hidden = !on; $('gUsage').hidden = !on;
+  if (!on) return;
+  const {t} = limitState(), L = settings.limits, box = $('gUsage');
+  box.textContent = '';
+  const row = (label, used, limit) => {
+    const r = document.createElement('div'); r.className = 'gu-row';
+    const l = document.createElement('span'); l.className = 'lbl'; l.textContent = label;
+    const v = document.createElement('span'); v.className = 'val'; v.textContent = `${fmtN(used)} / ${fmtN(limit)}`;
+    const bar = document.createElement('div'); bar.className = 'bar gu-bar';
+    const fill = document.createElement('span'); const pct = limit ? Math.min(100, used / limit * 100) : 100;
+    fill.style.width = pct + '%'; fill.className = pct >= 100 ? 'over' : pct >= 80 ? 'near' : '';
+    bar.appendChild(fill); r.append(l, v, bar); box.appendChild(r);
+  };
+  row('Today · map images', t.day.t, L.dayT);
+  row('Today · Street View', t.day.s, L.dayS);
+  row('This month · map images', t.mon.t, L.monT);
+  row('This month · Street View', t.mon.s, L.monS);
+  const note = document.createElement('p'); note.className = 'hint';
+  const blocked = googleBlocked();
+  note.textContent = (blocked ? 'Google map paused by your limit. ' : '') + `Daily counts reset at ${fmtTime(nextReset())}. ` +
+    (settings.token && settings.gistId ? 'Other devices’ counts arrive every few minutes. ' : 'Set up sync to combine devices. ') +
+    'Map images are an estimate on the high side; exact figures are in Google Cloud.';
+  box.appendChild(note);
+}
+
 /* ---------- Google: hybrid base map (Map Tiles API) + Street View (Maps JavaScript API) ----------
    The API key lives in this browser's settings only (never in the repo). Without a key, the Street View
    button opens Google Maps in a new tab instead. When Google's daily limit is reached, the map falls back
@@ -1623,12 +1782,8 @@ const LS_GSESS = 'ridemap.v1.gsessions';
 const g = {base:null, cover:null, sess:lsGet(LS_GSESS, {}), errs:0, oks:0, errTimer:null, attrib:'', logo:null, js:null, sv:null, svMarker:null};
 
 const googleKey = () => (settings.googleKey || '').trim();
-const googleBlocked = () => Date.now() < (+settings.googleBlockedUntil || 0);
-function nextPacificMidnight() { // Google daily quotas reset at midnight US Pacific; 08:00 UTC covers PST (an hour late in PDT)
-  const d = new Date(); d.setUTCHours(8, 0, 0, 0);
-  if (d.getTime() <= Date.now()) d.setUTCDate(d.getUTCDate() + 1);
-  return d.getTime();
-}
+const googleBlocked = () => settings.googleBlockedDay === pacificDay() || settings.googleBlockedMonth === pacificMonth() || !!limitState().tiles;
+if (settings.googlePreferred === undefined) settings.googlePreferred = view.base === GOOGLE_BASE;
 function googleError(status, body) {
   const msg = body?.error?.message || '';
   if (status === 429 || /quota|limit/i.test(msg)) return {quota:true, text:'Google daily limit reached'};
@@ -1680,12 +1835,15 @@ function showGoogleChrome(on) {
   if (on) { if (!g.logo) g.logo = new GoogleLogo().addTo(map); if (g.attrib) map.attributionControl.addAttribution(g.attrib); refreshGoogleAttribution(); }
   else { if (g.logo) { g.logo.remove(); g.logo = null; } if (g.attrib) map.attributionControl.removeAttribution(g.attrib); }
 }
-map.on('baselayerchange', e => showGoogleChrome(e.name === GOOGLE_BASE));
+map.on('baselayerchange', e => {
+  showGoogleChrome(e.name === GOOGLE_BASE);
+  if (!g.prog) { settings.googlePreferred = e.name === GOOGLE_BASE; lsSet(LS_SET, settings); } // app-made switches (fallback) don't count
+});
 map.on('moveend', () => { if (g.base && map.hasLayer(g.base)) refreshGoogleAttribution(); });
 
 // many tile failures in a row → find out why, then fall back to Esri or report the key problem
 function watchTiles(layer, kind) {
-  layer.on('tileload', () => { g.oks++; });
+  layer.on('tileload', () => { g.oks++; bump('t'); });
   layer.on('tileerror', e => {
     g.errs++;
     if (g.errTimer) return;
@@ -1703,15 +1861,17 @@ function watchTiles(layer, kind) {
   });
 }
 function googleFallback(info) {
-  if (info.quota) { settings.googleBlockedUntil = nextPacificMidnight(); lsSet(LS_SET, settings); }
-  if (g.base && map.hasLayer(g.base)) { map.removeLayer(g.base); bases[ESRI_BASE].addTo(map); showGoogleChrome(false); }
-  const until = info.quota ? ` until ${new Date(settings.googleBlockedUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : '';
-  toast(`${info.text}. Switched to the Esri map${until}.`, info.quota ? 'warn' : 'err', 9000);
+  if (info.quota) { settings.googleBlockedDay = pacificDay(); lsSet(LS_SET, settings); }
+  if (g.base && map.hasLayer(g.base)) { g.prog = true; map.removeLayer(g.base); bases[ESRI_BASE].addTo(map); g.prog = false; showGoogleChrome(false); }
+  const paused = info.quota || info.limit;
+  const until = paused ? ` until ${info.perMonth ? new Date(nextReset(true)).toLocaleDateString([], {day:'numeric', month:'short'}) + ', ' : ''}${fmtTime(nextReset(info.perMonth))}` : '';
+  toast(`${info.text}. Switched to the Esri map${until}.`, paused ? 'warn' : 'err', 9000);
+  renderUsage();
 }
 
 async function googleInit(switchTo = false) {
   if (!googleKey()) return;
-  if (googleBlocked()) { if (view.base === GOOGLE_BASE && !map.hasLayer(bases[ESRI_BASE])) bases[ESRI_BASE].addTo(map); return; }
+  if (googleBlocked()) { if (view.base === GOOGLE_BASE && !map.hasLayer(bases[ESRI_BASE])) { g.prog = true; bases[ESRI_BASE].addTo(map); g.prog = false; } return; }
   try {
     const sess = await tileSession('hybrid', {mapType:'satellite', layerTypes:['layerRoadmap'], language:'en', region:'MY',
       ...(hiDpi ? {scale:'scaleFactor2x', highDpi:true} : {})});
@@ -1722,9 +1882,12 @@ async function googleInit(switchTo = false) {
       bases[GOOGLE_BASE] = g.base;
       layerControl.addBaseLayer(g.base, GOOGLE_BASE);
     } else g.base.setUrl(url);
-    if (switchTo || view.base === GOOGLE_BASE) {
+    if (switchTo) { settings.googlePreferred = true; lsSet(LS_SET, settings); }
+    if (switchTo || settings.googlePreferred) {
+      g.prog = true;
       for (const [name, l] of Object.entries(bases)) if (name !== GOOGLE_BASE && map.hasLayer(l)) map.removeLayer(l);
       if (!map.hasLayer(g.base)) g.base.addTo(map);
+      g.prog = false;
       view.base = GOOGLE_BASE; saveView(); showGoogleChrome(true);
     }
   } catch (e) {
@@ -1778,6 +1941,12 @@ async function openStreetView(latlng) {
     window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)}`, '_blank', 'noopener');
     return;
   }
+  const svLim = !g.sv && limitState().sv; // an open viewer costs nothing more, so only a new one is limited
+  if (svLim) {
+    toast(`Street View ${svLim === 'day' ? 'daily' : 'monthly'} limit reached. Opening Google Maps instead.`, 'warn', 5000);
+    window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)}`, '_blank', 'noopener');
+    return;
+  }
   setBusy(true);
   try {
     await loadMapsJs();
@@ -1796,6 +1965,7 @@ async function openStreetView(latlng) {
         addressControl:true, fullscreenControl:true, motionTracking:false, motionTrackingControl:false, showRoadLabels:true});
       g.sv.addListener('position_changed', svMarkerUpdate);
       g.sv.addListener('pov_changed', svMarkerUpdate);
+      bump('s'); // billed once per viewer load
     } else { g.sv.setPano(data.location.pano); g.sv.setPov({heading, pitch:0}); g.sv.setVisible(true); }
     svMarkerUpdate();
   } catch (e) {
@@ -1889,8 +2059,11 @@ async function gh(path, opts = {}) {
   }
   return res.status === 204 ? null : res.json();
 }
+let pulledUsage = null; // usage file read by the last pullRemote
 async function pullRemote() {
   const g = await gh('/gists/' + encodeURIComponent(settings.gistId));
+  const uf = g.files?.[USAGE_FILE]; pulledUsage = null;
+  if (uf) { try { pulledUsage = normalizeUsage(JSON.parse(uf.content)); } catch (_) { pulledUsage = null; } }
   const f = g.files?.[GIST_FILE];
   if (!f) return null; // Gist exists but has no Ride Map file yet
   let txt = f.content;
@@ -1916,7 +2089,14 @@ async function syncNow(manual = false) {
     pruneTombstones(store);
     lsSet(LS_DATA, store); refreshUI();
     const content = JSON.stringify(store);
-    if (content !== remoteJson) await gh('/gists/' + encodeURIComponent(settings.gistId), {method:'PATCH', body:JSON.stringify({files:{[GIST_FILE]:{content}}})});
+    const ruJson = pulledUsage ? JSON.stringify(pulledUsage) : '';
+    if (pulledUsage) usage = mergeUsage(usage, pulledUsage);
+    pruneUsage(usage); lsSet(LS_USAGE, usage);
+    const uContent = JSON.stringify(usage), files = {};
+    if (content !== remoteJson) files[GIST_FILE] = {content};
+    if (uContent !== ruJson) files[USAGE_FILE] = {content:uContent};
+    if (Object.keys(files).length) await gh('/gists/' + encodeURIComponent(settings.gistId), {method:'PATCH', body:JSON.stringify({files})});
+    usageDirty = false; renderUsage(); checkLimits();
     settings.lastSync = Date.now(); lsSet(LS_SET, settings);
     setSyncState('ok', 'Synced at ' + new Date(settings.lastSync).toLocaleTimeString() + ` · ${store.features.length} segments`);
     if (manual) toast('Synced with Gist.');
@@ -1948,6 +2128,7 @@ async function createGist() {
 /* ---------- settings dialog ---------- */
 function openSettings() {
   $('setToken').value = settings.token; $('setGist').value = settings.gistId; $('setAuto').checked = settings.autosync; $('setGKey').value = settings.googleKey || '';
+  $('limDayT').value = settings.limits.dayT; $('limDayS').value = settings.limits.dayS; $('limMonT').value = settings.limits.monT; $('limMonS').value = settings.limits.monS;
   $('setClear').textContent = 'Clear local data'; $('setClear').dataset.armed = '';
   $('dlg').hidden = false; $('setToken').focus();
 }
@@ -1962,11 +2143,17 @@ $('setSave').onclick = async () => {
   $('setGist').value = settings.gistId;
   const gk = $('setGKey').value.trim();
   if (gk !== (settings.googleKey || '')) {
-    settings.googleKey = gk; settings.googleBlockedUntil = 0; g.sess = {}; lsSet(LS_GSESS, g.sess);
+    settings.googleKey = gk; settings.googleBlockedDay = ''; settings.googleBlockedMonth = ''; g.sess = {}; lsSet(LS_GSESS, g.sess);
     if (gk) { googleInit(true); showCoverage(mode === 'sv'); toast('Google key saved. Switching to the Google map…'); }
     else { if (g.base && map.hasLayer(g.base)) googleFallback({text:'Google key removed'}); }
   }
+  for (const [id, k] of [['limDayT', 'dayT'], ['limDayS', 'dayS'], ['limMonT', 'monT'], ['limMonS', 'monS']]) {
+    const v = parseInt($(id).value, 10);
+    if (Number.isFinite(v) && v >= 0) settings.limits[k] = v;
+  }
   lsSet(LS_SET, settings);
+  renderUsage(); checkLimits();
+  if (googleKey() && settings.googlePreferred && !googleBlocked() && !(g.base && map.hasLayer(g.base))) googleInit(); // limit raised
   const btn = $('setSave'); btn.disabled = true; btn.textContent = 'Syncing…';
   try { if (await syncNow(true)) closeSettings(); }
   finally { btn.disabled = false; btn.textContent = 'Save and sync'; }
@@ -2026,6 +2213,12 @@ document.addEventListener('keydown', e => {
 /* ---------- boot ---------- */
 refreshUI();
 googleInit();
+renderUsage();
+// bring the Google map back after a limit or quota resets (checked every 5 minutes and when the app is reopened)
+function googleResume() { renderUsage(); if (googleKey() && settings.googlePreferred && !googleBlocked() && !(g.base && map.hasLayer(g.base))) googleInit(); }
+setInterval(googleResume, 5 * 60e3);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') googleResume(); else lsSet(LS_USAGE, usage); });
+window.addEventListener('pagehide', () => lsSet(LS_USAGE, usage));
 if (typeof MVT === 'undefined') toast('Map tile decoder failed to load. Road mode will not work; reload the page.', 'err', 10000);
 setSheet(window.innerWidth > 700);
 if (settings.token && settings.gistId) syncNow(false); else setSyncState('', 'Sync not set up. Open Sync settings to connect a Gist.');
