@@ -136,6 +136,17 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 .cat[aria-checked="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
 .dlg textarea{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:8px 10px;color:var(--fg);font:14px var(--f-body);resize:vertical}
 .dlg input#pinName{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:8px 10px;color:var(--fg);font:15px var(--f-body)}
+/* Google + Street View */
+.glogo{background:rgba(255,255,255,.92);color:#3c4043;font:500 12px/1 Arial,sans-serif;padding:4px 7px;border-radius:4px;margin:0 10px 6px 0!important;letter-spacing:.01em}
+.svme{background:none;border:0}
+.svme span{display:block;width:28px;height:28px;border-radius:50%;background:#fbbc04 radial-gradient(circle at 50% 62%,#fff 0 4px,transparent 5px);border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.5);position:relative}
+.svme span::before{content:"";position:absolute;left:50%;top:-9px;margin-left:-6px;border:6px solid transparent;border-bottom:9px solid #fbbc04}
+.svpanel{position:fixed;z-index:1250;background:#000;box-shadow:var(--shadow);left:0;right:0;bottom:0;height:52%;padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (min-width:900px){.svpanel{left:auto;top:0;height:auto;width:46%;padding-top:env(safe-area-inset-top,0px)}}
+.svview{position:absolute;inset:0}
+.svclose{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) * 0 + 10px);left:10px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:18px}
+body.sv-open .stack{display:none}
+@media (max-width:899px){body.sv-open .fabs{top:calc(env(safe-area-inset-top,0px) + 70px)}}
 /* Popup */
 .leaflet-popup-content{font-family:var(--f-body);margin:10px 12px}
 .pp h3{margin:0 0 4px;font:700 16px/1.2 var(--f-ui)}
@@ -172,6 +183,7 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 
 <div class="fabs">
   <button id="btnLocate" title="Show my location" aria-label="Show my location"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+  <button id="btnSv" title="Street View" aria-label="Street View"><svg viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2.5"/><path d="M9 21v-6H7.5v-5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v5H15v6"/></svg></button>
   <button id="btnErase" title="Remove roads in an area" aria-label="Remove roads in an area"><svg viewBox="0 0 24 24"><path d="m7 21-4-4a2 2 0 0 1 0-2.8L13.2 4a2 2 0 0 1 2.8 0l5 5a2 2 0 0 1 0 2.8L12 21"/><path d="M7 21h14"/><path d="m9 11 6 6"/></svg></button>
   <button id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
 </div>
@@ -233,6 +245,11 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
 </section>
 </div>
 
+<section id="svPanel" class="svpanel" hidden aria-label="Street View">
+  <div id="svView" class="svview"></div>
+  <button id="svClose" class="svclose" aria-label="Close Street View">✕</button>
+</section>
+
 <div id="pinDlg" class="dlg-back" hidden>
   <form id="pinForm" class="dlg" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
     <h2 id="pinTitle">New pin</h2>
@@ -254,6 +271,7 @@ button:focus-visible,input:focus-visible,.btn:focus-within{outline:2px solid var
     <label class="fld">GitHub token<input id="setToken" type="password" autocomplete="off" spellcheck="false" placeholder="ghp_…"></label>
     <label class="fld">Gist ID (leave empty, then Create new Gist)<input id="setGist" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 3f9a1c…"></label>
     <label class="chk"><input id="setAuto" type="checkbox"> Sync automatically after changes</label>
+    <label class="fld">Google Maps API key (optional: Google satellite map + Street View; this device only)<input id="setGKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…"></label>
     <div id="setStatus" class="status">Not synced yet.</div>
     <div class="row">
       <button id="setSave" class="btn primary">Save and sync</button>
@@ -864,7 +882,9 @@ function openPinPopup(id) {
   ed.onclick = () => { map.closePopup(); openPinDialog(p); };
   const del = document.createElement('button'); del.textContent = 'Delete';
   del.onclick = () => { map.closePopup(); deletePin(p.id); toast('Deleted pin ' + (p.name || c.label), '', 5000, {label:'Undo', fn:undo}); };
-  row.append(nav, ed, del); el.appendChild(row);
+  const svb = document.createElement('button'); svb.className = 'plain'; svb.textContent = 'Street View';
+  svb.onclick = () => { map.closePopup(); openStreetView(L.latLng(p.lat, p.lon)); };
+  row.append(nav, svb, ed, del); el.appendChild(row);
   L.popup({autoPanPadding:[40, 80], offset:[0, -12]}).setLatLng([p.lat, p.lon]).setContent(el).openOn(map);
 }
 
@@ -1414,6 +1434,9 @@ function setMode(m) {
   map.getContainer().classList.toggle('free-mode', m !== 'road');
   if (prevMode === 'erase' || m === 'erase') eraseEnable(m === 'erase');
   $('btnErase').classList.toggle('on', m === 'erase');
+  $('btnSv').classList.toggle('on', m === 'sv');
+  if (prevMode === 'sv') { showCoverage(false); closeStreetView(); }
+  if (m === 'sv') showCoverage(true);
   $('drawbar').hidden = m !== 'free'; $('routebar').hidden = m !== 'route'; $('erasebar').hidden = m !== 'erase';
   document.body.classList.toggle('drawing', m !== 'road'); // lifts messages above the bar
   if (m !== 'road') setSheet(false);
@@ -1421,6 +1444,7 @@ function setMode(m) {
   if (m === 'free') { draft.dots.addTo(map); updateDraft(); } else { clearDraft(); map.removeLayer(draft.dots); }
   if (m === 'route') { route.layer.addTo(map); routeRedraw(); } else { clearRoute(); map.removeLayer(route.layer); }
   if (m === 'pin') toast('Tap the map where you want a pin.');
+  if (m === 'sv') toast(googleKey() ? (googleBlocked() ? 'Google map limit reached for today, so the blue lines are hidden. Tap a road to open Street View.' : 'Tap a blue line to open Street View.') : 'Tap a spot to open Street View in Google Maps. Add a Google key in Sync settings to view it here.', '', 5000);
   if (m === 'erase') toast('Move the map into place first, then drag a box over the roads to remove. Pinch or the mouse wheel still zooms.', '', 6000);
 }
 function updateDraft() {
@@ -1459,6 +1483,7 @@ map.on('click', e => {
   if (Date.now() < suppressMapClickUntil || mode === 'erase') return;
   if (mode === 'free') { draft.pts.push(e.latlng); updateDraft(); }
   else if (mode === 'route') onRouteTap(e.latlng);
+  else if (mode === 'sv') openStreetView(e.latlng);
   else if (mode === 'pin') openPinDialog({lat:r5(e.latlng.lat), lon:r5(e.latlng.lng)});
   else onRoadTap(e.latlng);
 });
@@ -1562,6 +1587,203 @@ $('eraseCancel').onclick = () => setMode('road');
 $('eraseGo').onclick = eraseApply;
 $('eraseTouch').onchange = eraseRefresh;
 $('erasePins').onchange = eraseRefresh;
+
+/* ---------- Google: hybrid base map (Map Tiles API) + Street View (Maps JavaScript API) ----------
+   The API key lives in this browser's settings only (never in the repo). Without a key, the Street View
+   button opens Google Maps in a new tab instead. When Google's daily limit is reached, the map falls back
+   to the Esri hybrid until Google's quota resets (midnight US Pacific time). */
+const GOOGLE_BASE = 'Google Hybrid';
+const ESRI_BASE = 'Hybrid (satellite + labels)';
+const LS_GSESS = 'ridemap.v1.gsessions';
+const g = {base:null, cover:null, sess:lsGet(LS_GSESS, {}), errs:0, oks:0, errTimer:null, attrib:'', logo:null, js:null, sv:null, svMarker:null};
+
+const googleKey = () => (settings.googleKey || '').trim();
+const googleBlocked = () => Date.now() < (+settings.googleBlockedUntil || 0);
+function nextPacificMidnight() { // Google daily quotas reset at midnight US Pacific; 08:00 UTC covers PST (an hour late in PDT)
+  const d = new Date(); d.setUTCHours(8, 0, 0, 0);
+  if (d.getTime() <= Date.now()) d.setUTCDate(d.getUTCDate() + 1);
+  return d.getTime();
+}
+function googleError(status, body) {
+  const msg = body?.error?.message || '';
+  if (status === 429 || /quota|limit/i.test(msg)) return {quota:true, text:'Google daily limit reached'};
+  if (status === 403 || status === 401) return {key:true, text:`Google rejected the key (HTTP ${status}${msg ? ': ' + msg.slice(0, 120) : ''}). Check the API is enabled and the key allows ${location.host}.`};
+  return {text:`Google returned HTTP ${status}${msg ? ': ' + msg.slice(0, 120) : ''}`};
+}
+
+// Map Tiles sessions last about two weeks; cache them per kind so a reload doesn't create new ones
+async function tileSession(kind, body) {
+  const key = googleKey(), s = g.sess[kind];
+  if (s && s.key === hash(key) && s.expiry * 1000 > Date.now() + 36e5) return s.session;
+  let r;
+  try {
+    r = await fetch('https://tile.googleapis.com/v1/createSession?key=' + encodeURIComponent(key),
+      {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  } catch (e) { throw new Error('cannot reach tile.googleapis.com (' + (e.message || 'offline') + ')'); }
+  let j = null; try { j = await r.json(); } catch (_) {}
+  if (!r.ok || !j?.session) { const er = new Error(googleError(r.status, j).text); er.info = googleError(r.status, j); throw er; }
+  g.sess[kind] = {session:j.session, expiry:+j.expiry || (Date.now() / 1000 + 864e3), key:hash(key)};
+  lsSet(LS_GSESS, g.sess);
+  return j.session;
+}
+const hiDpi = (window.devicePixelRatio || 1) >= 1.5;
+const tileUrl = sess => `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${encodeURIComponent(sess)}&key=${encodeURIComponent(googleKey())}`;
+
+// Google logo requirement: "Google Maps" text badge (allowed when space is limited) + copyright from the viewport endpoint
+const GoogleLogo = L.Control.extend({
+  options:{position:'bottomright'},
+  onAdd() { const d = L.DomUtil.create('div', 'glogo'); d.textContent = 'Google Maps'; d.setAttribute('aria-label', 'Google Maps'); return d; }
+});
+let viewportTimer = null;
+function refreshGoogleAttribution() {
+  clearTimeout(viewportTimer);
+  viewportTimer = setTimeout(async () => {
+    if (!g.base || !map.hasLayer(g.base) || !g.sess.hybrid) return;
+    const b = map.getBounds();
+    const q = new URLSearchParams({session:g.sess.hybrid.session, key:googleKey(), zoom:String(Math.round(map.getZoom())),
+      north:b.getNorth().toFixed(5), south:b.getSouth().toFixed(5), east:b.getEast().toFixed(5), west:b.getWest().toFixed(5)});
+    try {
+      const r = await fetch('https://tile.googleapis.com/tile/v1/viewport?' + q);
+      if (!r.ok) return;
+      const j = await r.json();
+      const text = (j.copyright || 'Map data ©Google').replace(/[<>&]/g, '');
+      if (text !== g.attrib) { if (g.attrib) map.attributionControl.removeAttribution(g.attrib); g.attrib = text; map.attributionControl.addAttribution(text); }
+    } catch (_) { /* attribution refresh is best-effort */ }
+  }, 1500);
+}
+function showGoogleChrome(on) {
+  if (on) { if (!g.logo) g.logo = new GoogleLogo().addTo(map); if (g.attrib) map.attributionControl.addAttribution(g.attrib); refreshGoogleAttribution(); }
+  else { if (g.logo) { g.logo.remove(); g.logo = null; } if (g.attrib) map.attributionControl.removeAttribution(g.attrib); }
+}
+map.on('baselayerchange', e => showGoogleChrome(e.name === GOOGLE_BASE));
+map.on('moveend', () => { if (g.base && map.hasLayer(g.base)) refreshGoogleAttribution(); });
+
+// many tile failures in a row → find out why, then fall back to Esri or report the key problem
+function watchTiles(layer, kind) {
+  layer.on('tileload', () => { g.oks++; });
+  layer.on('tileerror', e => {
+    g.errs++;
+    if (g.errTimer) return;
+    g.errTimer = setTimeout(async () => {
+      const errs = g.errs, oks = g.oks; g.errs = 0; g.oks = 0; g.errTimer = null;
+      if (errs < 4) return;
+      let info = null;
+      try { const r = await fetch(e.tile.src); if (!r.ok) { let j = null; try { j = await r.json(); } catch (_) {} info = googleError(r.status, j); if (r.status === 400) info.session = true; } }
+      catch (_) { info = oks ? null : {text:'Google map images are not loading (blocked or offline)'}; }
+      if (!info) return;
+      if (info.session) { delete g.sess[kind]; lsSet(LS_GSESS, g.sess); googleInit(); return; } // expired session: get a fresh one
+      if (kind === 'hybrid') googleFallback(info);
+      else { toast('Street View coverage lines: ' + info.text, 'err', 7000); if (g.cover) g.cover.remove(); }
+    }, 2500);
+  });
+}
+function googleFallback(info) {
+  if (info.quota) { settings.googleBlockedUntil = nextPacificMidnight(); lsSet(LS_SET, settings); }
+  if (g.base && map.hasLayer(g.base)) { map.removeLayer(g.base); bases[ESRI_BASE].addTo(map); showGoogleChrome(false); }
+  const until = info.quota ? ` until ${new Date(settings.googleBlockedUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : '';
+  toast(`${info.text}. Switched to the Esri map${until}.`, info.quota ? 'warn' : 'err', 9000);
+}
+
+async function googleInit(switchTo = false) {
+  if (!googleKey()) return;
+  if (googleBlocked()) { if (view.base === GOOGLE_BASE && !map.hasLayer(bases[ESRI_BASE])) bases[ESRI_BASE].addTo(map); return; }
+  try {
+    const sess = await tileSession('hybrid', {mapType:'satellite', layerTypes:['layerRoadmap'], language:'en', region:'MY',
+      ...(hiDpi ? {scale:'scaleFactor2x', highDpi:true} : {})});
+    const url = tileUrl(sess);
+    if (!g.base) {
+      g.base = L.tileLayer(url, {maxZoom:19, maxNativeZoom:20, tileSize:256, crossOrigin:false});
+      watchTiles(g.base, 'hybrid');
+      bases[GOOGLE_BASE] = g.base;
+      layerControl.addBaseLayer(g.base, GOOGLE_BASE);
+    } else g.base.setUrl(url);
+    if (switchTo || view.base === GOOGLE_BASE) {
+      for (const [name, l] of Object.entries(bases)) if (name !== GOOGLE_BASE && map.hasLayer(l)) map.removeLayer(l);
+      if (!map.hasLayer(g.base)) g.base.addTo(map);
+      view.base = GOOGLE_BASE; saveView(); showGoogleChrome(true);
+    }
+  } catch (e) {
+    if (e.info?.quota) googleFallback(e.info);
+    else toast('Google map: ' + e.message, 'err', 9000);
+  }
+}
+
+async function showCoverage(on) {
+  if (!on) { if (g.cover) g.cover.remove(); return; }
+  if (!googleKey() || googleBlocked()) return;
+  try {
+    const sess = await tileSession('cover', {mapType:'roadmap', layerTypes:['layerStreetview'], overlay:true, imageFormat:'png', language:'en', region:'MY',
+      ...(hiDpi ? {scale:'scaleFactor2x', highDpi:true} : {})});
+    if (!g.cover) { g.cover = L.tileLayer(tileUrl(sess), {maxZoom:19, maxNativeZoom:20, opacity:.85, zIndex:5}); watchTiles(g.cover, 'cover'); }
+    else g.cover.setUrl(tileUrl(sess));
+    if (mode === 'sv') g.cover.addTo(map);
+  } catch (e) { toast('Street View coverage lines: ' + e.message, 'err', 7000); }
+}
+
+/* Maps JavaScript API, loaded only the first time Street View is opened */
+window.gm_authFailure = () => { toast(`Google rejected the API key for Street View. Check that "Maps JavaScript API" is enabled and the key allows ${location.host}.`, 'err', 10000); closeStreetView(); };
+function loadMapsJs() {
+  if (g.js) return g.js;
+  g.js = new Promise((resolve, reject) => {
+    window.__rmGmReady = () => resolve();
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleKey())}&v=weekly&loading=async&callback=__rmGmReady`;
+    s.async = true;
+    s.onerror = () => { g.js = null; reject(new Error('could not load Google Maps JavaScript (blocked or offline)')); };
+    document.head.appendChild(s);
+    setTimeout(() => { if (!window.google?.maps) { g.js = null; reject(new Error('Google Maps JavaScript did not start within 20 s')); } }, 20000);
+  });
+  return g.js;
+}
+function bearing(a, b) { // degrees from a to b, both {lat,lng}
+  const k = Math.PI / 180, y = Math.sin((b.lng - a.lng) * k) * Math.cos(b.lat * k);
+  const x = Math.cos(a.lat * k) * Math.sin(b.lat * k) - Math.sin(a.lat * k) * Math.cos(b.lat * k) * Math.cos((b.lng - a.lng) * k);
+  return (Math.atan2(y, x) / k + 360) % 360;
+}
+function svMarkerUpdate() {
+  if (!g.sv) return;
+  const p = g.sv.getPosition(); if (!p) return;
+  const ll = [p.lat(), p.lng()], h = g.sv.getPov().heading || 0;
+  const html = `<span style="transform:rotate(${h}deg)"></span>`;
+  if (!g.svMarker) g.svMarker = L.marker(ll, {icon:L.divIcon({className:'svme', html, iconSize:[28, 28], iconAnchor:[14, 14]}), interactive:false, zIndexOffset:1000}).addTo(map);
+  else { g.svMarker.setLatLng(ll); const el = g.svMarker.getElement()?.firstChild; if (el) el.style.transform = `rotate(${h}deg)`; }
+}
+async function openStreetView(latlng) {
+  if (!googleKey()) { // no key: hand over to Google Maps
+    window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)}`, '_blank', 'noopener');
+    return;
+  }
+  setBusy(true);
+  try {
+    await loadMapsJs();
+    const {StreetViewService, StreetViewPanorama, StreetViewPreference, StreetViewSource} = await google.maps.importLibrary('streetView');
+    const radius = Math.min(1000, Math.max(30, Math.round(map.distance(map.getCenter(), map.containerPointToLatLng(map.latLngToContainerPoint(map.getCenter()).add([30, 0]))))));
+    let data;
+    try {
+      ({data} = await new StreetViewService().getPanorama({location:{lat:latlng.lat, lng:latlng.lng}, radius,
+        preference:StreetViewPreference.NEAREST, sources:[StreetViewSource.OUTDOOR]}));
+    } catch (_) { toast('No Street View imagery near that spot. Tap on or next to a blue line.', 'warn', 5000); return; }
+    const pos = {lat:data.location.latLng.lat(), lng:data.location.latLng.lng()};
+    const heading = map.distance(pos, latlng) > 8 ? bearing(pos, {lat:latlng.lat, lng:latlng.lng}) : 0;
+    $('svPanel').hidden = false; document.body.classList.add('sv-open');
+    if (!g.sv) { // one viewer reused for every spot: Google bills each new viewer, not each move
+      g.sv = new StreetViewPanorama($('svView'), {pano:data.location.pano, pov:{heading, pitch:0}, zoom:0,
+        addressControl:true, fullscreenControl:true, motionTracking:false, motionTrackingControl:false, showRoadLabels:true});
+      g.sv.addListener('position_changed', svMarkerUpdate);
+      g.sv.addListener('pov_changed', svMarkerUpdate);
+    } else { g.sv.setPano(data.location.pano); g.sv.setPov({heading, pitch:0}); g.sv.setVisible(true); }
+    svMarkerUpdate();
+  } catch (e) {
+    toast('Street View failed: ' + e.message, 'err', 8000);
+  } finally { setBusy(false); }
+}
+function closeStreetView() {
+  $('svPanel').hidden = true; document.body.classList.remove('sv-open');
+  if (g.sv) g.sv.setVisible(false);
+  if (g.svMarker) { g.svMarker.remove(); g.svMarker = null; }
+}
+$('svClose').onclick = closeStreetView;
+$('btnSv').onclick = () => setMode(mode === 'sv' ? 'road' : 'sv');
 
 /* ---------- import / export ---------- */
 function thin(coords, minM = 8) {
@@ -1700,7 +1922,7 @@ async function createGist() {
 
 /* ---------- settings dialog ---------- */
 function openSettings() {
-  $('setToken').value = settings.token; $('setGist').value = settings.gistId; $('setAuto').checked = settings.autosync;
+  $('setToken').value = settings.token; $('setGist').value = settings.gistId; $('setAuto').checked = settings.autosync; $('setGKey').value = settings.googleKey || '';
   $('setClear').textContent = 'Clear local data'; $('setClear').dataset.armed = '';
   $('dlg').hidden = false; $('setToken').focus();
 }
@@ -1713,6 +1935,12 @@ $('setSave').onclick = async () => {
   settings.gistId = $('setGist').value.trim().replace(/^https?:\/\/gist\.github\.com\/[^/]+\//, '').replace(/[^0-9a-f]/gi, '');
   settings.autosync = $('setAuto').checked;
   $('setGist').value = settings.gistId;
+  const gk = $('setGKey').value.trim();
+  if (gk !== (settings.googleKey || '')) {
+    settings.googleKey = gk; settings.googleBlockedUntil = 0; g.sess = {}; lsSet(LS_GSESS, g.sess);
+    if (gk) { googleInit(true); showCoverage(mode === 'sv'); toast('Google key saved. Switching to the Google map…'); }
+    else { if (g.base && map.hasLayer(g.base)) googleFallback({text:'Google key removed'}); }
+  }
   lsSet(LS_SET, settings);
   const btn = $('setSave'); btn.disabled = true; btn.textContent = 'Syncing…';
   try { if (await syncNow(true)) closeSettings(); }
@@ -1762,6 +1990,7 @@ $('btnUndo').onclick = undo;
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('pinDlg').hidden) { closePinDialog(); return; }
   if (e.key === 'Escape' && mode === 'erase') { setMode('road'); return; }
+  if (e.key === 'Escape' && mode === 'sv') { if (!$('svPanel').hidden) closeStreetView(); else setMode('road'); return; }
   if (e.target.matches('input, textarea, select')) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   else if (e.key === 'Escape') { if (!$('dlg').hidden) closeSettings(); else if (mode === 'free') { clearDraft(); setMode('road'); } else if (mode === 'route') { clearRoute(); setMode('road'); } }
@@ -1771,6 +2000,7 @@ document.addEventListener('keydown', e => {
 
 /* ---------- boot ---------- */
 refreshUI();
+googleInit();
 if (typeof MVT === 'undefined') toast('Map tile decoder failed to load. Road mode will not work; reload the page.', 'err', 10000);
 setSheet(window.innerWidth > 700);
 if (settings.token && settings.gistId) syncNow(false); else setSyncState('', 'Sync not set up. Open Sync settings to connect a Gist.');
