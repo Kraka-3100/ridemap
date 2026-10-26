@@ -1854,7 +1854,7 @@ function watchTiles(layer, kind) {
       try { const r = await fetch(e.tile.src); if (!r.ok) { let j = null; try { j = await r.json(); } catch (_) {} info = googleError(r.status, j); if (r.status === 400) info.session = true; } }
       catch (_) { info = oks ? null : {text:'Google map images are not loading (blocked or offline)'}; }
       if (!info) return;
-      if (info.session) { delete g.sess[kind]; lsSet(LS_GSESS, g.sess); googleInit(); return; } // expired session: get a fresh one
+      if (info.session) { delete g.sess[kind]; lsSet(LS_GSESS, g.sess); if (kind === 'cover') showCoverage(mode === 'sv'); else googleInit(); return; } // expired session: get a fresh one for that layer
       if (kind === 'hybrid') googleFallback(info);
       else { toast('Street View coverage lines: ' + info.text, 'err', 7000); if (g.cover) g.cover.remove(); }
     }, 2500);
@@ -1902,7 +1902,7 @@ async function showCoverage(on) {
   try {
     const sess = await tileSession('cover', {mapType:'roadmap', layerTypes:['layerStreetview'], overlay:true, imageFormat:'png', language:'en', region:'MY',
       ...(hiDpi ? {scale:'scaleFactor2x', highDpi:true} : {})});
-    if (!g.cover) { g.cover = L.tileLayer(tileUrl(sess), {maxZoom:19, maxNativeZoom:20, opacity:.85, zIndex:5}); watchTiles(g.cover, 'cover'); }
+    if (!g.cover) { g.cover = L.tileLayer(tileUrl(sess), {maxZoom:19, maxNativeZoom:20, opacity:.85, zIndex:1000}); watchTiles(g.cover, 'cover'); } // zIndex 1000: above every base map (the layer switcher numbers base maps 1, 2, 3 …)
     else g.cover.setUrl(tileUrl(sess));
     if (mode === 'sv') g.cover.addTo(map);
   } catch (e) { toast('Street View coverage lines: ' + e.message, 'err', 7000); }
