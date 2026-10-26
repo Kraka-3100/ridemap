@@ -517,15 +517,40 @@ map.on('baselayerchange', e => { view.base = e.name; saveView(); });
 const layers = new Map(); // feature id → L.LayerGroup
 let suppressMapClickUntil = 0;
 
+// line widths follow the zoom: thin when zoomed out so the map stays readable, full width up close
+function lineStyle(z, planned) {
+  const w = z <= 6 ? 1.5 : z <= 8 ? 2 : z <= 10 ? 2.5 : z <= 12 ? 3.5 : z <= 14 ? 4.5 : 5;
+  const pad = z <= 9 ? 0 : z <= 12 ? 2 : 3; // no dark outline when zoomed far out
+  const dash = planned ? (z <= 10 ? '5 5' : z <= 13 ? '8 6' : '10 8') : null;
+  return {line:{weight:w, dashArray:dash}, casing:{weight:w + pad, opacity:pad ? (planned ? .2 : .35) : 0}};
+}
+let styleZoom = null;
+function restyleAll() {
+  const z = Math.round(map.getZoom());
+  if (z === styleZoom) return;
+  styleZoom = z;
+  const st = [lineStyle(z, false), lineStyle(z, true)];
+  // set options directly instead of setStyle (one redraw per layer adds up to ~0.6 s at 10,000 segments);
+  // this handler runs before the renderers' own zoom redraw, which then paints every line with the new widths
+  for (const g of layers.values()) {
+    const s = st[g.planned ? 1 : 0];
+    Object.assign(g.casing.options, s.casing); Object.assign(g.line.options, s.line);
+    g.line.options._dashArray = s.line.dashArray ? s.line.dashArray.split(' ').map(Number) : null; // Leaflet caches the parsed dash pattern here
+  }
+  for (const r of [riddenRenderer, plannedRenderer, riddenCasingRenderer, plannedCasingRenderer]) if (r._map) r._redraw?.();
+}
+map.on('zoomend', restyleAll);
 function drawFeature(f) {
   const p = f.properties;
   if (layers.has(p.id)) return;
   const ll = f.geometry.coordinates.map(c => [c[1], c[0]]);
   const planned = p.status === 'planned', renderer = planned ? plannedRenderer : riddenRenderer;
-  const casing = L.polyline(ll, {renderer:planned ? plannedCasingRenderer : riddenCasingRenderer, color:'#000', weight:8, opacity:planned ? .2 : .35, interactive:false, lineCap:'round', lineJoin:'round'});
-  const line = L.polyline(ll, {renderer, color:planned ? PLANNED_COLOR : RIDDEN_COLOR, weight:5, opacity:.95, lineCap:'round', lineJoin:'round', dashArray:planned ? '10 8' : null});
+  const s = lineStyle(Math.round(map.getZoom()), planned);
+  const casing = L.polyline(ll, {renderer:planned ? plannedCasingRenderer : riddenCasingRenderer, color:'#000', ...s.casing, interactive:false, lineCap:'round', lineJoin:'round'});
+  const line = L.polyline(ll, {renderer, color:planned ? PLANNED_COLOR : RIDDEN_COLOR, ...s.line, opacity:.95, lineCap:'round', lineJoin:'round'});
   line.on('click', e => { suppressMapClickUntil = Date.now() + 400; L.DomEvent.stop(e); openFeaturePopup(p.id, e.latlng); });
   const g = L.layerGroup([casing, line]).addTo(planned ? plannedGroup : riddenGroup);
+  g.planned = planned; g.casing = casing; g.line = line;
   layers.set(p.id, g);
 }
 function undrawFeature(id) { const g = layers.get(id); if (g) { g.remove(); layers.delete(id); } }
