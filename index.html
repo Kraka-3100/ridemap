@@ -541,7 +541,8 @@ function lineStyle(z, planned) {
   const w = z <= 6 ? 1.5 : z <= 8 ? 2 : z <= 10 ? 2.5 : z <= 12 ? 3.5 : z <= 14 ? 4.5 : 5;
   const pad = z <= 9 ? 0 : z <= 12 ? 2 : 3; // no dark outline when zoomed far out
   const dash = planned ? (z <= 10 ? '5 5' : z <= 13 ? '8 6' : '10 8') : null;
-  return {line:{weight:w, dashArray:dash}, casing:{weight:w + pad, opacity:pad ? (planned ? .2 : .35) : 0}};
+  const op = z <= 12 ? .6 : z <= 14 ? .8 : .95; // see-through when zoomed out, so map labels under the lines stay readable
+  return {line:{weight:w, dashArray:dash, opacity:op}, casing:{weight:w + pad, opacity:pad ? (planned ? .2 : .35) * op / .95 : 0}};
 }
 let styleZoom = null;
 function restyleAll() {
@@ -566,7 +567,7 @@ function drawFeature(f) {
   const planned = p.status === 'planned', renderer = planned ? plannedRenderer : riddenRenderer;
   const s = lineStyle(Math.round(map.getZoom()), planned);
   const casing = L.polyline(ll, {renderer:planned ? plannedCasingRenderer : riddenCasingRenderer, color:'#000', ...s.casing, interactive:false, lineCap:'round', lineJoin:'round'});
-  const line = L.polyline(ll, {renderer, color:planned ? PLANNED_COLOR : RIDDEN_COLOR, ...s.line, opacity:.95, lineCap:'round', lineJoin:'round'});
+  const line = L.polyline(ll, {renderer, color:planned ? PLANNED_COLOR : RIDDEN_COLOR, ...s.line, lineCap:'round', lineJoin:'round'});
   line.on('click', e => { suppressMapClickUntil = Date.now() + 400; L.DomEvent.stop(e); openFeaturePopup(p.id, e.latlng); });
   const g = L.layerGroup([casing, line]).addTo(planned ? plannedGroup : riddenGroup);
   g.planned = planned; g.casing = casing; g.line = line;
@@ -1488,7 +1489,7 @@ function setMode(m) {
   if (m === 'free') { draft.dots.addTo(map); updateDraft(); } else { clearDraft(); map.removeLayer(draft.dots); }
   if (m === 'route') { route.layer.addTo(map); routeRedraw(); } else { clearRoute(); map.removeLayer(route.layer); }
   if (m === 'pin') toast('Tap the map where you want a pin.');
-  if (m === 'sv') toast(googleKey() ? (googleBlocked() ? 'Google map limit reached for today, so the blue lines are hidden. Tap a road to open Street View.' : 'Tap a blue line to open Street View.') : 'Tap a spot to open Street View in Google Maps. Add a Google key in Sync settings to view it here.', '', 5000);
+  if (m === 'sv') toast(googleKey() ? (googleBlocked() ? 'Google map limit reached for today, so the blue lines are hidden. Tap a road to open Street View.' : (map.getZoom() < COVER_MIN_ZOOM ? 'Zoom in to see the blue Street View lines, then tap one.' : 'Tap a blue line to open Street View.')) : 'Tap a spot to open Street View in Google Maps. Add a Google key in Sync settings to view it here.', '', 5000);
   if (m === 'erase') toast('Move the map into place first, then drag a box over the roads to remove. Pinch or the mouse wheel still zooms.', '', 6000);
 }
 function updateDraft() {
@@ -1896,13 +1897,22 @@ async function googleInit(switchTo = false) {
   }
 }
 
+// Street View lines: hidden below zoom 12 (Google draws them as thick bands there, and it saves map images),
+// lighter at 12–13 so they don't swamp the map
+const COVER_MIN_ZOOM = 12;
+const coverOpacity = () => map.getZoom() <= 13 ? .5 : .8;
+map.on('zoomend', () => {
+  if (!g.cover) return;
+  g.cover.setOpacity(coverOpacity());
+  if (mode === 'sv' && map.getZoom() < COVER_MIN_ZOOM && !g.zoomHinted) { g.zoomHinted = true; toast('Zoom in further to see the blue Street View lines.', '', 4000); }
+});
 async function showCoverage(on) {
   if (!on) { if (g.cover) g.cover.remove(); return; }
   if (!googleKey() || googleBlocked()) return;
   try {
     const sess = await tileSession('cover', {mapType:'roadmap', layerTypes:['layerStreetview'], overlay:true, imageFormat:'png', language:'en', region:'MY',
       ...(hiDpi ? {scale:'scaleFactor2x', highDpi:true} : {})});
-    if (!g.cover) { g.cover = L.tileLayer(tileUrl(sess), {maxZoom:19, maxNativeZoom:20, opacity:.85, zIndex:1000}); watchTiles(g.cover, 'cover'); } // zIndex 1000: above every base map (the layer switcher numbers base maps 1, 2, 3 …)
+    if (!g.cover) { g.cover = L.tileLayer(tileUrl(sess), {minZoom:COVER_MIN_ZOOM, maxZoom:19, maxNativeZoom:20, opacity:coverOpacity(), zIndex:1000}); watchTiles(g.cover, 'cover'); } // zIndex 1000: above every base map (the layer switcher numbers base maps 1, 2, 3 …)
     else g.cover.setUrl(tileUrl(sess));
     if (mode === 'sv') g.cover.addTo(map);
   } catch (e) { toast('Street View coverage lines: ' + e.message, 'err', 7000); }
